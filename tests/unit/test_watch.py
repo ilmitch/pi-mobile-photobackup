@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
+from aethereal.common.platform import LocalPlatformOps
 from aethereal.watch.clock import (
     ClockState,
     ClockTrust,
@@ -109,6 +113,52 @@ def test_clock_skew() -> None:
 
 
 # --- watch service ---
+
+
+def test_sync_from_phone_sets_clock_and_marks_trusted() -> None:
+    calls: list[datetime] = []
+    watch = WatchService(
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1,
+        telemetry_reader=lambda _p: _telemetry(),
+        set_system_time=calls.append,
+    )
+    now = datetime(2026, 7, 12, 10, 0, 0, tzinfo=timezone.utc)
+    assert watch.sync_from_phone(now) is ClockState.CLOCK_PHONE_SYNCED
+    assert calls == [now]  # the OS clock was set from the browser time
+
+
+def test_sync_from_phone_tolerates_unsupported_platform() -> None:
+    def refuse(_when: datetime) -> None:
+        raise NotImplementedError
+
+    watch = WatchService(
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1,
+        telemetry_reader=lambda _p: _telemetry(),
+        set_system_time=refuse,
+    )
+    # Clock-set unsupported (e.g. macOS dev) -> still marked trusted.
+    assert watch.sync_from_phone(datetime.now(timezone.utc)) is ClockState.CLOCK_PHONE_SYNCED
+
+
+def test_sync_from_phone_without_time_only_marks() -> None:
+    calls: list[datetime] = []
+    watch = WatchService(
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1,
+        telemetry_reader=lambda _p: _telemetry(),
+        set_system_time=calls.append,
+    )
+    assert watch.sync_from_phone(None) is ClockState.CLOCK_PHONE_SYNCED
+    assert calls == []  # no clock set without a supplied time
+
+
+@pytest.mark.skipif(sys.platform == "linux", reason="clock-set is refused only off Linux")
+def test_local_platform_set_system_time_refused_off_pi() -> None:
+    # On non-Linux hosts (e.g. macOS dev) setting the clock is refused, never attempted.
+    with pytest.raises(NotImplementedError):
+        LocalPlatformOps().set_system_time(datetime.now(timezone.utc))
 
 
 def test_watch_service_snapshot() -> None:

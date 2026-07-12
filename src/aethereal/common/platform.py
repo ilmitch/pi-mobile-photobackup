@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol
 
@@ -46,6 +47,10 @@ class PlatformOps(Protocol):
         """Reboot the device (WEB-004). Raises NotImplementedError where unsupported."""
         ...
 
+    def set_system_time(self, when: datetime) -> None:
+        """Set the OS wall clock (TIME-003). Raises NotImplementedError where unsupported."""
+        ...
+
 
 class LocalPlatformOps:
     """Real implementation backed by the running OS (works on macOS and Linux)."""
@@ -75,6 +80,14 @@ class LocalPlatformOps:
             raise NotImplementedError(f"power control is not available on {sys.platform}")
         subprocess.run(command, check=True)
 
+    def set_system_time(self, when: datetime) -> None:
+        # Refuse on non-Linux hosts (a dev Mac already has a real clock).
+        if sys.platform != "linux":
+            raise NotImplementedError(f"setting the clock is not available on {sys.platform}")
+        # Set the clock in UTC so the result is independent of the system timezone.
+        utc = when.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+        subprocess.run(["date", "-u", "-s", utc], check=True)
+
 
 @dataclass(frozen=True, slots=True)
 class FakePlatformOps:
@@ -93,4 +106,7 @@ class FakePlatformOps:
         return None
 
     def reboot(self) -> None:
+        return None
+
+    def set_system_time(self, when: datetime) -> None:  # noqa: ARG002
         return None

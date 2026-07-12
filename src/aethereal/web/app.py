@@ -18,6 +18,7 @@ import time
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 import psutil
@@ -41,6 +42,12 @@ class MediaSelectRequest(BaseModel):
     """Body for choosing the active source when several cards are present (SRC-008)."""
 
     uuid: str
+
+
+class TimeSyncRequest(BaseModel):
+    """Body for phone time sync (TIME-003): the browser's current wall-clock time."""
+
+    browser_time: datetime | None = None
 
 
 class NoSourceError(Exception):
@@ -289,13 +296,16 @@ def create_app(
         return {"requested": True, "job_id": job_id}
 
     @app.post("/api/v1/time/sync", status_code=202)
-    async def time_sync(_auth: None = Depends(require_auth)) -> dict[str, object]:
-        # TIME-003: the phone establishes trusted wall-clock time. (Setting the OS clock
-        # from the browser time is a Raspberry Pi platform op; here we mark trust.)
+    async def time_sync(
+        body: TimeSyncRequest | None = None, _auth: None = Depends(require_auth)
+    ) -> dict[str, object]:
+        # TIME-003: the phone establishes trusted time; with a browser timestamp the OS
+        # clock is set from it (so dated sessions are correct without an RTC).
         if watch is None:
             raise HTTPException(status_code=409, detail="clock management not available")
-        watch.clock.mark_phone_synced()
-        return {"clock_state": watch.clock.state.value}
+        browser_time = body.browser_time if body is not None else None
+        state = watch.sync_from_phone(browser_time)
+        return {"clock_state": state.value}
 
     @app.post("/api/v1/system/shutdown", status_code=202)
     async def shutdown(_auth: None = Depends(require_auth)) -> dict[str, object]:

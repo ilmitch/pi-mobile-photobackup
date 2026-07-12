@@ -50,6 +50,9 @@ class RecordingPlatform:
             raise NotImplementedError("power control is not available on darwin")
         self.calls.append("reboot")
 
+    def set_system_time(self, when: datetime) -> None:  # noqa: ARG002
+        self.calls.append("set_system_time")
+
 
 def _build(
     tmp_path: Path,
@@ -212,6 +215,22 @@ def test_time_sync_marks_clock_trusted(tmp_path: Path) -> None:
         assert resp.status_code == 202
         assert resp.json()["clock_state"] == "CLOCK_PHONE_SYNCED"
         assert client.get("/api/v1/system").json()["clock_state"] == "CLOCK_PHONE_SYNCED"
+
+
+def test_time_sync_sets_clock_from_browser_time(tmp_path: Path) -> None:
+    calls: list[object] = []
+    watch = WatchService(
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1,
+        telemetry_reader=lambda _p: Telemetry(None, None, 1.0, 1.0, 1, 1),
+        set_system_time=calls.append,
+    )
+    app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}), watch=watch)
+    with TestClient(app) as client:
+        resp = client.post("/api/v1/time/sync", json={"browser_time": "2026-07-12T10:00:00+00:00"})
+        assert resp.status_code == 202
+        assert resp.json()["clock_state"] == "CLOCK_PHONE_SYNCED"
+        assert len(calls) == 1  # the clock was set from the supplied browser time
 
 
 def test_time_sync_409_without_watch(tmp_path: Path) -> None:

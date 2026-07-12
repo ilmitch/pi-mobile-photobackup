@@ -18,7 +18,10 @@ ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
 # and udev libraries for pyudev.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         e2fsprogs \
+        dosfstools \
+        exfatprogs \
         util-linux \
+        mount \
         kmod \
         udev \
         libudev1 \

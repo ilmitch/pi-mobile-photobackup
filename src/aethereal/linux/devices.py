@@ -12,7 +12,7 @@ import json
 import subprocess
 import sys
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 # Columns requested from lsblk. SIZE is in bytes (``--bytes``); RO is a boolean.
 _LSBLK_COLUMNS = "NAME,PATH,FSTYPE,UUID,LABEL,SIZE,RO,MOUNTPOINT,TYPE,MODEL,SERIAL,PARTUUID"
@@ -101,8 +101,41 @@ def parse_lsblk_json(data: Mapping[str, object]) -> list[BlockDevice]:
     return [_device_from_node(node) for node in devices if isinstance(node, Mapping)]
 
 
+def _blkid_probe(path: str) -> dict[str, str]:
+    """Probe a device directly with ``blkid`` (works without a running udevd)."""
+    try:
+        output = subprocess.run(
+            ["blkid", "-o", "export", path],
+            check=True, capture_output=True, text=True,
+        ).stdout
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {}
+    result: dict[str, str] = {}
+    for line in output.splitlines():
+        if "=" in line:
+            key, value = line.split("=", 1)
+            result[key] = value
+    return result
+
+
+def _enrich(device: BlockDevice) -> BlockDevice:
+    """Fill in UUID/FSTYPE/LABEL from blkid when lsblk (via udev) did not provide them.
+
+    lsblk sources these from the udev database, which is empty in containers and can lag on
+    hotplug; blkid reads the on-disk superblock directly. Enrichment is best-effort.
+    """
+    uuid, fstype, label = device.uuid, device.fstype, device.label
+    if device.path is not None and (uuid is None or fstype is None):
+        probe = _blkid_probe(device.path)
+        uuid = uuid or probe.get("UUID")
+        fstype = fstype or probe.get("TYPE")
+        label = label or probe.get("LABEL")
+    children = tuple(_enrich(child) for child in device.children)
+    return replace(device, uuid=uuid, fstype=fstype, label=label, children=children)
+
+
 def list_block_devices() -> list[BlockDevice]:
-    """Enumerate block devices on the host (Linux only)."""
+    """Enumerate block devices on the host, enriching identity via blkid (Linux only)."""
     if sys.platform != "linux":
         raise NotImplementedError(f"block-device enumeration requires Linux, not {sys.platform}")
     output = subprocess.run(
@@ -111,7 +144,7 @@ def list_block_devices() -> list[BlockDevice]:
         capture_output=True,
         text=True,
     ).stdout
-    return parse_lsblk_json(json.loads(output))
+    return [_enrich(device) for device in parse_lsblk_json(json.loads(output))]
 
 
 def flatten_devices(devices: list[BlockDevice]) -> list[BlockDevice]:

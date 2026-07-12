@@ -119,6 +119,15 @@
   </section>
 
   <section class="card">
+    <h2>System</h2>
+    <div class="row"><span class="k">CPU temp</span><span class="v" id="sys-temp">—</span></div>
+    <div class="row"><span class="k">System storage</span><span class="v" id="sys-storage">—</span></div>
+    <div class="row"><span class="k">Clock</span><span class="v" id="sys-clock">—</span></div>
+    <div class="row"><span class="k">Power</span><span class="v" id="sys-power">—</span></div>
+    <div id="sys-warnings" style="margin-top:.5rem; font-size:.82rem;"></div>
+  </section>
+
+  <section class="card">
     <h2>Device</h2>
     <div class="actions">
       <button class="secondary" id="btn-reboot">Reboot</button>
@@ -234,6 +243,23 @@ async function refreshDestination() {
   } catch (e) {}
 }
 
+async function refreshSystem() {
+  try {
+    const s = await api("/api/v1/system");
+    $("sys-temp").textContent = s.cpu_temperature_celsius != null ? `${s.cpu_temperature_celsius.toFixed(1)} °C` : "n/a";
+    $("sys-storage").textContent = s.storage_free_bytes != null ? `${fmtBytes(s.storage_free_bytes)} free` : "—";
+    $("sys-clock").textContent = s.clock_state ? s.clock_state.replace("CLOCK_", "").replace("_", " ").toLowerCase() : "—";
+    const power = $("sys-power");
+    if (s.undervoltage == null) { power.textContent = "—"; power.className = "v muted"; }
+    else if (s.undervoltage) { power.textContent = "undervoltage"; power.className = "v err"; }
+    else { power.textContent = "OK"; power.className = "v ok"; }
+    const warnings = s.warnings || [];
+    $("sys-warnings").innerHTML = warnings.length
+      ? warnings.map(w => `<div class="err">⚠ ${w.message}</div>`).join("")
+      : "";
+  } catch (e) {}
+}
+
 async function refreshHistory() {
   try {
     const { jobs } = await api("/api/v1/backups");
@@ -332,9 +358,10 @@ $("btn-shutdown").onclick = () =>
 refreshStatus();
 refreshSource();
 refreshDestination();
+refreshSystem();
 refreshHistory();
 connectWS();
-setInterval(() => { refreshStatus(); refreshSource(); refreshDestination(); }, 5000);
+setInterval(() => { refreshStatus(); refreshSource(); refreshDestination(); refreshSystem(); }, 5000);
 </script>
 </body>
 </html>

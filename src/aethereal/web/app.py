@@ -286,6 +286,15 @@ def create_app(
             raise HTTPException(status_code=409, detail="no active backup to cancel")
         return {"requested": True, "job_id": job_id}
 
+    @app.post("/api/v1/time/sync", status_code=202)
+    async def time_sync(_auth: None = Depends(require_auth)) -> dict[str, object]:
+        # TIME-003: the phone establishes trusted wall-clock time. (Setting the OS clock
+        # from the browser time is a Raspberry Pi platform op; here we mark trust.)
+        if watch is None:
+            raise HTTPException(status_code=409, detail="clock management not available")
+        watch.clock.mark_phone_synced()
+        return {"clock_state": watch.clock.state.value}
+
     @app.post("/api/v1/system/shutdown", status_code=202)
     async def shutdown(_auth: None = Depends(require_auth)) -> dict[str, object]:
         try:

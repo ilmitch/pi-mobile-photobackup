@@ -151,9 +151,7 @@ class ManifestRepository:
         return int(row[0])
 
     def set_backup_job_state(self, backup_job_id: str, state: str) -> None:
-        self._conn.execute(
-            "UPDATE backup_job SET state = ? WHERE id = ?", (state, backup_job_id)
-        )
+        self._conn.execute("UPDATE backup_job SET state = ? WHERE id = ?", (state, backup_job_id))
 
     _JOB_COLUMNS = (
         "id",
@@ -295,9 +293,7 @@ class ManifestRepository:
         return [(int(r[0]), str(r[1]), str(r[2])) for r in rows]
 
     def finalize_session_entry_by_id(self, entry_id: int) -> None:
-        self._conn.execute(
-            "UPDATE session_entry SET state = 'VERIFIED' WHERE id = ?", (entry_id,)
-        )
+        self._conn.execute("UPDATE session_entry SET state = 'VERIFIED' WHERE id = ?", (entry_id,))
 
     def discard_pending_object(self, content_object_id: int) -> None:
         """Delete an unrecoverable pending object and its pending session entries."""

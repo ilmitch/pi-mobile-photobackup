@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint · types · tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv (with cache)
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff format check
+        run: uv run ruff format --check src tests scripts
+
+      - name: Ruff lint
+        run: uv run ruff check src tests scripts
+
+      - name: Type check (mypy --strict)
+        run: uv run mypy
+
+      - name: Tests
+        # Loopback/mount fault tests require root + privileged and skip on the runner.
+        run: uv run pytest -q
+
+      - name: Build package
+        run: uv build

@@ -85,7 +85,9 @@ class EventBus:
     client can fill a small gap without unbounded memory growth.
     """
 
-    def __init__(self, *, recent_capacity: int = 1024, clock: Callable[[], datetime] = _utc_now) -> None:
+    def __init__(
+        self, *, recent_capacity: int = 1024, clock: Callable[[], datetime] = _utc_now
+    ) -> None:
         self._lock = threading.Lock()
         self._sequence = 0
         self._subscribers: list[Subscriber] = []

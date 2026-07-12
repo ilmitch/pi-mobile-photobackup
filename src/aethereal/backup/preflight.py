@@ -107,7 +107,9 @@ def _scan_source(
     return inputs, records
 
 
-def _to_classified(items: Iterable[ClassificationInput], classification_of: dict[str, FileClassification]) -> list[ClassifiedFile]:
+def _to_classified(
+    items: Iterable[ClassificationInput], classification_of: dict[str, FileClassification]
+) -> list[ClassifiedFile]:
     result: list[ClassifiedFile] = []
     for item in items:
         size = item.identity.size_bytes if item.identity is not None else 0
@@ -144,8 +146,7 @@ def run_preflight(
     snapshot = build_source_snapshot(records)
 
     classification_of = {
-        item.relative_path: classify(item, verified=verified, occupant=occupant)
-        for item in inputs
+        item.relative_path: classify(item, verified=verified, occupant=occupant) for item in inputs
     }
     classified = _to_classified(inputs, classification_of)
     plan = build_plan(classified, session_root=session_root)
@@ -180,9 +181,7 @@ def run_preflight(
     else:
         outcome = PreflightOutcome.READY
 
-    new_file_count = sum(
-        1 for f in plan.files if f.classification is FileClassification.NEW
-    )
+    new_file_count = sum(1 for f in plan.files if f.classification is FileClassification.NEW)
     source_bytes = sum(f.planned_size_bytes for f in plan.files if f.identity is not None)
     already_backed_up_bytes = sum(
         f.planned_size_bytes

@@ -19,9 +19,7 @@ from aethereal.common.config import load_config
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Aethereal backup appliance")
-    parser.add_argument(
-        "--config", type=Path, default=Path("/etc/aethereal-backup/config.yaml")
-    )
+    parser.add_argument("--config", type=Path, default=Path("/etc/aethereal-backup/config.yaml"))
     parser.add_argument("--host", default=None, help="bind address (default: config static_ip)")
     parser.add_argument("--port", type=int, default=8011)
     args = parser.parse_args()

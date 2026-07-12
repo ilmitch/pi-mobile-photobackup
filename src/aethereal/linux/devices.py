@@ -68,9 +68,7 @@ def _device_from_node(node: Mapping[str, object]) -> BlockDevice:
     children_nodes = node.get("children")
     children: tuple[BlockDevice, ...] = ()
     if isinstance(children_nodes, list):
-        children = tuple(
-            _device_from_node(c) for c in children_nodes if isinstance(c, Mapping)
-        )
+        children = tuple(_device_from_node(c) for c in children_nodes if isinstance(c, Mapping))
 
     def _str(key: str) -> str | None:
         value = node.get(key)
@@ -111,7 +109,9 @@ def _blkid_probe(path: str) -> dict[str, str]:
     try:
         output = subprocess.run(
             ["blkid", "-p", "-o", "export", path],
-            check=True, capture_output=True, text=True,
+            check=True,
+            capture_output=True,
+            text=True,
         ).stdout
     except (subprocess.CalledProcessError, FileNotFoundError):
         return {}

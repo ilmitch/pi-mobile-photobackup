@@ -50,7 +50,8 @@ def test_no_warnings_when_healthy() -> None:
 def test_thermal_warning() -> None:
     warnings = evaluate(
         _telemetry(cpu_temperature_celsius=80.0),
-        thermal_warning_celsius=75, storage_critical_bytes=1,
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1,
     )
     assert [w.kind for w in warnings] == [WarningKind.THERMAL]
 
@@ -65,7 +66,8 @@ def test_power_warning_on_undervoltage() -> None:
 def test_storage_warning_when_low() -> None:
     warnings = evaluate(
         _telemetry(storage_free_bytes=500),
-        thermal_warning_celsius=75, storage_critical_bytes=1_000_000_000,
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1_000_000_000,
     )
     assert WarningKind.STORAGE in [w.kind for w in warnings]
 
@@ -74,7 +76,8 @@ def test_missing_metrics_do_not_warn() -> None:
     # Off-Pi, temperature/undervoltage are None and must not trip warnings.
     warnings = evaluate(
         _telemetry(cpu_temperature_celsius=None, undervoltage=None),
-        thermal_warning_celsius=75, storage_critical_bytes=1,
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1,
     )
     assert warnings == []
 
@@ -112,7 +115,9 @@ def test_watch_service_snapshot() -> None:
     watch = WatchService(
         thermal_warning_celsius=75,
         storage_critical_bytes=1_000_000_000,
-        telemetry_reader=lambda _path: _telemetry(cpu_temperature_celsius=90.0, storage_free_bytes=100),
+        telemetry_reader=lambda _path: _telemetry(
+            cpu_temperature_celsius=90.0, storage_free_bytes=100
+        ),
     )
     health = watch.snapshot()
     kinds = {w.kind for w in health.warnings}

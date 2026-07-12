@@ -57,9 +57,16 @@ def _encode_record(record: SourceFileRecord) -> bytes:
     if record.size_bytes < 0:
         raise ValueError("size_bytes must be non-negative")
     path = normalize_relative_path(record.relative_path)
-    return b"\x00".join(
-        (path.encode("utf-8"), str(record.size_bytes).encode("ascii"), record.sha256.encode("ascii"))
-    ) + b"\n"
+    return (
+        b"\x00".join(
+            (
+                path.encode("utf-8"),
+                str(record.size_bytes).encode("ascii"),
+                record.sha256.encode("ascii"),
+            )
+        )
+        + b"\n"
+    )
 
 
 def build_canonical_manifest(records: Iterable[SourceFileRecord]) -> bytes:

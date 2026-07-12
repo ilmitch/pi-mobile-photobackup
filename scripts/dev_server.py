@@ -51,9 +51,7 @@ def _make_engine(
     reserve_floor_bytes: int | None = None,
 ) -> tuple[BackupEngine, ManifestRepository, EventBus]:
     backup_root.mkdir(parents=True, exist_ok=True)
-    conn = open_destination_manifest(
-        backup_root / "manifest.sqlite3", check_same_thread=False
-    )
+    conn = open_destination_manifest(backup_root / "manifest.sqlite3", check_same_thread=False)
     repo = ManifestRepository(conn)
     bus = EventBus()
     extra: dict[str, int] = {}

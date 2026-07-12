@@ -60,9 +60,7 @@ def recover_destination(
     for pending in repo.list_pending_finalize():
         expected = ContentIdentity(size_bytes=pending.size_bytes, sha256=pending.sha256)
         final = (
-            Path(pending.final_path)
-            if pending.final_path
-            else object_path(root, pending.sha256)
+            Path(pending.final_path) if pending.final_path else object_path(root, pending.sha256)
         )
         temp = Path(pending.temp_path) if pending.temp_path else None
 
@@ -73,7 +71,10 @@ def recover_destination(
         else:
             candidate = None
 
-        if candidate is not None and content_identity_of_path(candidate, chunk_bytes=chunk_bytes) == expected:
+        if (
+            candidate is not None
+            and content_identity_of_path(candidate, chunk_bytes=chunk_bytes) == expected
+        ):
             if candidate is not final:
                 os.replace(candidate, final)
                 _fsync_dir(final.parent)
@@ -92,6 +93,4 @@ def recover_destination(
             discarded += 1
 
     orphans = _remove_orphan_partials(root)
-    return RecoveryReport(
-        finalized=finalized, discarded=discarded, orphan_partials_removed=orphans
-    )
+    return RecoveryReport(finalized=finalized, discarded=discarded, orphan_partials_removed=orphans)

@@ -33,19 +33,26 @@ def test_identical_manifest_identical_snapshot() -> None:
 def test_path_change_changes_snapshot() -> None:
     base = [_rec("DCIM/IMG_1.CR3", 10, "aa")]
     moved = [_rec("DCIM/IMG_2.CR3", 10, "aa")]
-    assert build_source_snapshot(base).snapshot_sha256 != build_source_snapshot(moved).snapshot_sha256
+    assert (
+        build_source_snapshot(base).snapshot_sha256 != build_source_snapshot(moved).snapshot_sha256
+    )
 
 
 def test_size_change_changes_snapshot() -> None:
     base = [_rec("a.txt", 10, "aa")]
     bigger = [_rec("a.txt", 11, "aa")]
-    assert build_source_snapshot(base).snapshot_sha256 != build_source_snapshot(bigger).snapshot_sha256
+    assert (
+        build_source_snapshot(base).snapshot_sha256 != build_source_snapshot(bigger).snapshot_sha256
+    )
 
 
 def test_content_hash_change_changes_snapshot() -> None:
     base = [_rec("a.txt", 10, "aa")]
     changed = [_rec("a.txt", 10, "ab")]
-    assert build_source_snapshot(base).snapshot_sha256 != build_source_snapshot(changed).snapshot_sha256
+    assert (
+        build_source_snapshot(base).snapshot_sha256
+        != build_source_snapshot(changed).snapshot_sha256
+    )
 
 
 def test_snapshot_counts_and_totals() -> None:

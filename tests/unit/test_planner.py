@@ -19,9 +19,7 @@ def _new(path: str, data: bytes) -> ClassifiedFile:
 
 
 def test_all_new_distinct_are_copied() -> None:
-    plan = build_plan(
-        [_new("a.cr3", b"aaaa"), _new("b.cr3", b"bbbbbb")], session_root=SESSION
-    )
+    plan = build_plan([_new("a.cr3", b"aaaa"), _new("b.cr3", b"bbbbbb")], session_root=SESSION)
     assert plan.new_object_count == 2
     assert plan.new_object_bytes == 4 + 6
     assert plan.largest_new_object_bytes == 6

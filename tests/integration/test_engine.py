@@ -83,7 +83,9 @@ def test_run_backup_completes(tmp_path: Path) -> None:
 
 
 def test_blocked_capacity_leaves_engine_recoverable(tmp_path: Path) -> None:
-    engine, _repo = _engine(tmp_path, platform=FakePlatformOps(total_bytes=1_000_000_000_000, free_bytes=100))
+    engine, _repo = _engine(
+        tmp_path, platform=FakePlatformOps(total_bytes=1_000_000_000_000, free_bytes=100)
+    )
     src = _source(tmp_path, {"big.mp4": b"x" * 500})
 
     result = engine.run_backup(src, "CANON_CARD_01")
@@ -210,9 +212,7 @@ def test_untrusted_clock_blocks_backup(tmp_path: Path) -> None:
     assert engine.state is BackupState.PREFLIGHT_BLOCKED
     assert repo.list_backup_jobs() == []  # no dated session/job created
     reasons = [
-        str(e.details.get("reasons"))
-        for e in received
-        if e.type is EventType.PREFLIGHT_COMPLETED
+        str(e.details.get("reasons")) for e in received if e.type is EventType.PREFLIGHT_COMPLETED
     ]
     assert any("untrusted" in r for r in reasons)
 

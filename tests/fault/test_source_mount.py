@@ -42,7 +42,8 @@ def _make_loop(tmp_path: Path, mkfs: list[str], size_mb: int = 32) -> str:
     image = tmp_path / "media.img"
     subprocess.run(
         ["dd", "if=/dev/zero", f"of={image}", "bs=1M", f"count={size_mb}"],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     try:
         subprocess.run([*mkfs, str(image)], check=True, capture_output=True)
@@ -51,7 +52,9 @@ def _make_loop(tmp_path: Path, mkfs: list[str], size_mb: int = 32) -> str:
     try:
         return subprocess.run(
             ["losetup", "--find", "--show", str(image)],
-            check=True, capture_output=True, text=True,
+            check=True,
+            capture_output=True,
+            text=True,
         ).stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         pytest.skip(f"losetup unavailable (needs privileged container): {exc}")
@@ -65,7 +68,9 @@ def _uuid_of(device: str) -> str:
     # -p probes the superblock directly (no stale cache across loop-device reuse).
     return subprocess.run(
         ["blkid", "-p", "-s", "UUID", "-o", "value", device],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
 
 
@@ -118,7 +123,8 @@ def test_writable_mount_is_detected(vfat_loop: str, tmp_path: Path) -> None:
     mount_point.mkdir()
     subprocess.run(
         ["mount", "-o", "rw", "-t", "vfat", vfat_loop, str(mount_point)],
-        check=True, capture_output=True,
+        check=True,
+        capture_output=True,
     )
     try:
         assert effective_read_only(mount_point) is False

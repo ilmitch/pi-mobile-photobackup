@@ -10,40 +10,89 @@ from aethereal.linux.validation import find_source_candidates, validate_destinat
 LSBLK = {
     "blockdevices": [
         {
-            "name": "mmcblk0", "path": "/dev/mmcblk0", "fstype": None, "uuid": None,
-            "label": None, "size": 32000000000, "ro": False, "mountpoint": None,
-            "type": "disk", "model": None, "serial": "SD-SYS", "partuuid": None,
+            "name": "mmcblk0",
+            "path": "/dev/mmcblk0",
+            "fstype": None,
+            "uuid": None,
+            "label": None,
+            "size": 32000000000,
+            "ro": False,
+            "mountpoint": None,
+            "type": "disk",
+            "model": None,
+            "serial": "SD-SYS",
+            "partuuid": None,
             "children": [
                 {
-                    "name": "mmcblk0p2", "path": "/dev/mmcblk0p2", "fstype": "ext4",
-                    "uuid": "system-root-uuid", "label": "rootfs", "size": 31000000000,
-                    "ro": False, "mountpoint": "/", "type": "part", "model": None,
-                    "serial": None, "partuuid": "aaaa-0002",
+                    "name": "mmcblk0p2",
+                    "path": "/dev/mmcblk0p2",
+                    "fstype": "ext4",
+                    "uuid": "system-root-uuid",
+                    "label": "rootfs",
+                    "size": 31000000000,
+                    "ro": False,
+                    "mountpoint": "/",
+                    "type": "part",
+                    "model": None,
+                    "serial": None,
+                    "partuuid": "aaaa-0002",
                 },
             ],
         },
         {
-            "name": "sdb", "path": "/dev/sdb", "fstype": None, "uuid": None, "label": None,
-            "size": 2000000000000, "ro": False, "mountpoint": None, "type": "disk",
-            "model": "Backup SSD", "serial": "SSD-123",
+            "name": "sdb",
+            "path": "/dev/sdb",
+            "fstype": None,
+            "uuid": None,
+            "label": None,
+            "size": 2000000000000,
+            "ro": False,
+            "mountpoint": None,
+            "type": "disk",
+            "model": "Backup SSD",
+            "serial": "SSD-123",
             "children": [
                 {
-                    "name": "sdb1", "path": "/dev/sdb1", "fstype": "ext4",
-                    "uuid": "dest-ssd-uuid", "label": "AETHEREAL", "size": 2000000000000,
-                    "ro": False, "mountpoint": "/Backups", "type": "part", "model": None,
-                    "serial": None, "partuuid": "bbbb-0001",
+                    "name": "sdb1",
+                    "path": "/dev/sdb1",
+                    "fstype": "ext4",
+                    "uuid": "dest-ssd-uuid",
+                    "label": "AETHEREAL",
+                    "size": 2000000000000,
+                    "ro": False,
+                    "mountpoint": "/Backups",
+                    "type": "part",
+                    "model": None,
+                    "serial": None,
+                    "partuuid": "bbbb-0001",
                 },
             ],
         },
         {
-            "name": "sda", "path": "/dev/sda", "fstype": None, "uuid": None, "label": None,
-            "size": 64000000000, "ro": False, "mountpoint": None, "type": "disk",
-            "model": "USB Reader", "serial": "CARD-RDR",
+            "name": "sda",
+            "path": "/dev/sda",
+            "fstype": None,
+            "uuid": None,
+            "label": None,
+            "size": 64000000000,
+            "ro": False,
+            "mountpoint": None,
+            "type": "disk",
+            "model": "USB Reader",
+            "serial": "CARD-RDR",
             "children": [
                 {
-                    "name": "sda1", "path": "/dev/sda1", "fstype": "exfat",
-                    "uuid": "card-uuid", "label": "CANON", "size": 64000000000, "ro": False,
-                    "mountpoint": None, "type": "part", "model": None, "serial": None,
+                    "name": "sda1",
+                    "path": "/dev/sda1",
+                    "fstype": "exfat",
+                    "uuid": "card-uuid",
+                    "label": "CANON",
+                    "size": 64000000000,
+                    "ro": False,
+                    "mountpoint": None,
+                    "type": "part",
+                    "model": None,
+                    "serial": None,
                     "partuuid": "cccc-0001",
                 },
             ],
@@ -88,11 +137,24 @@ def test_validate_destination_rejects_wrong_disk_by_uuid() -> None:
 
 def test_validate_destination_requires_ext4() -> None:
     devices = parse_lsblk_json(
-        {"blockdevices": [
-            {"name": "sdb1", "path": "/dev/sdb1", "fstype": "exfat", "uuid": "d",
-             "label": None, "size": 1, "ro": False, "mountpoint": "/Backups",
-             "type": "part", "model": None, "serial": None, "partuuid": None},
-        ]}
+        {
+            "blockdevices": [
+                {
+                    "name": "sdb1",
+                    "path": "/dev/sdb1",
+                    "fstype": "exfat",
+                    "uuid": "d",
+                    "label": None,
+                    "size": 1,
+                    "ro": False,
+                    "mountpoint": "/Backups",
+                    "type": "part",
+                    "model": None,
+                    "serial": None,
+                    "partuuid": None,
+                },
+            ]
+        }
     )
     result = validate_destination(devices, configured_uuid="d")
     assert result.ok is False
@@ -101,11 +163,24 @@ def test_validate_destination_requires_ext4() -> None:
 
 def test_validate_destination_must_be_mounted() -> None:
     devices = parse_lsblk_json(
-        {"blockdevices": [
-            {"name": "sdb1", "path": "/dev/sdb1", "fstype": "ext4", "uuid": "d",
-             "label": None, "size": 1, "ro": False, "mountpoint": None,
-             "type": "part", "model": None, "serial": None, "partuuid": None},
-        ]}
+        {
+            "blockdevices": [
+                {
+                    "name": "sdb1",
+                    "path": "/dev/sdb1",
+                    "fstype": "ext4",
+                    "uuid": "d",
+                    "label": None,
+                    "size": 1,
+                    "ro": False,
+                    "mountpoint": None,
+                    "type": "part",
+                    "model": None,
+                    "serial": None,
+                    "partuuid": None,
+                },
+            ]
+        }
     )
     result = validate_destination(devices, configured_uuid="d")
     assert result.ok is False
@@ -123,13 +198,37 @@ def test_source_candidates_exclude_destination_and_system() -> None:
 
 def test_read_only_flag_parsed_from_string_or_bool() -> None:
     devices = parse_lsblk_json(
-        {"blockdevices": [
-            {"name": "a", "path": "/dev/a", "fstype": "exfat", "uuid": "u1", "label": None,
-             "size": 1, "ro": "1", "mountpoint": None, "type": "part", "model": None,
-             "serial": None, "partuuid": None},
-            {"name": "b", "path": "/dev/b", "fstype": "exfat", "uuid": "u2", "label": None,
-             "size": 1, "ro": True, "mountpoint": None, "type": "part", "model": None,
-             "serial": None, "partuuid": None},
-        ]}
+        {
+            "blockdevices": [
+                {
+                    "name": "a",
+                    "path": "/dev/a",
+                    "fstype": "exfat",
+                    "uuid": "u1",
+                    "label": None,
+                    "size": 1,
+                    "ro": "1",
+                    "mountpoint": None,
+                    "type": "part",
+                    "model": None,
+                    "serial": None,
+                    "partuuid": None,
+                },
+                {
+                    "name": "b",
+                    "path": "/dev/b",
+                    "fstype": "exfat",
+                    "uuid": "u2",
+                    "label": None,
+                    "size": 1,
+                    "ro": True,
+                    "mountpoint": None,
+                    "type": "part",
+                    "model": None,
+                    "serial": None,
+                    "partuuid": None,
+                },
+            ]
+        }
     )
     assert all(d.read_only for d in devices)

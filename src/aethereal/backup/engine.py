@@ -238,7 +238,9 @@ class BackupEngine:
         result = self._run_preflight(source_root, session_root)
         self._last_scan = (str(source_root), result.already_backed_up_bytes)
         self._emit(
-            EventType.PREFLIGHT_COMPLETED, EventSeverity.INFO, "dry run complete",
+            EventType.PREFLIGHT_COMPLETED,
+            EventSeverity.INFO,
+            "dry run complete",
             outcome=result.outcome.value,
         )
         return result
@@ -278,12 +280,12 @@ class BackupEngine:
                     "created (TIME-001)"
                 )
             self._emit(
-                EventType.PREFLIGHT_COMPLETED, EventSeverity.WARNING, "preflight blocked",
+                EventType.PREFLIGHT_COMPLETED,
+                EventSeverity.WARNING,
+                "preflight blocked",
                 reasons=reasons,
             )
-            return EngineResult(
-                self._sm.state, PreflightOutcome.BLOCKED, preflight, None, None
-            )
+            return EngineResult(self._sm.state, PreflightOutcome.BLOCKED, preflight, None, None)
 
         if preflight.outcome is PreflightOutcome.WARNING:
             self._sm.transition(BackupState.PREFLIGHT_WARNING)
@@ -332,7 +334,9 @@ class BackupEngine:
             self._sm.transition(BackupState.BACKUP_CANCELLING)
             self._sm.transition(BackupState.BACKUP_CANCELLED)
             self._emit(
-                EventType.BACKUP_CANCELLED, EventSeverity.WARNING, "backup cancelled",
+                EventType.BACKUP_CANCELLED,
+                EventSeverity.WARNING,
+                "backup cancelled",
                 job_id=job_id,
             )
             self._sm.transition(BackupState.SOURCE_SAFE_TO_REMOVE)
@@ -345,13 +349,19 @@ class BackupEngine:
 
         if job.outcome is JobOutcome.FAILED:
             self._emit(
-                EventType.BACKUP_FAILED, EventSeverity.ERROR, "backup failed",
-                job_id=job_id, failures=list(job.failures),
+                EventType.BACKUP_FAILED,
+                EventSeverity.ERROR,
+                "backup failed",
+                job_id=job_id,
+                failures=list(job.failures),
             )
         else:
             self._emit(
-                EventType.BACKUP_COMPLETED, EventSeverity.INFO, "backup completed",
-                job_id=job_id, outcome=job.outcome.value,
+                EventType.BACKUP_COMPLETED,
+                EventSeverity.INFO,
+                "backup completed",
+                job_id=job_id,
+                outcome=job.outcome.value,
             )
             # All scanned content is now backed up: reflect that in the source bar.
             self._last_scan = (str(source_root), preflight.source_bytes_scanned)
@@ -359,9 +369,7 @@ class BackupEngine:
 
         return EngineResult(self._sm.state, preflight.outcome, preflight, job, job_id)
 
-    def _finish_job_row(
-        self, job_id: str, state: BackupState, job: JobRunResult
-    ) -> None:
+    def _finish_job_row(self, job_id: str, state: BackupState, job: JobRunResult) -> None:
         self._repo.finish_backup_job(
             job_id,
             state=state.value,

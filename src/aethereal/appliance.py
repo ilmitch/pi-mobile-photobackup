@@ -46,6 +46,7 @@ def build_appliance(
     watch = WatchService(
         thermal_warning_celsius=config.thermal.warning_celsius,
         storage_critical_bytes=config.system_storage.critical_free_bytes,
+        set_system_time=platform.set_system_time,
     )
 
     engine = BackupEngine(

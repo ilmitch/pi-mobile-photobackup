@@ -387,8 +387,12 @@ $("btn-shutdown").onclick = () =>
   systemAction("/api/v1/system/shutdown", "Shut down the device now?", "Shut Down");
 
 $("btn-sync-time").onclick = async () => {
-  try { await api("/api/v1/time/sync", { method: "POST" }); }
-  catch (e) { alert("Could not set time: " + e.message); }
+  try {
+    await api("/api/v1/time/sync", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ browser_time: new Date().toISOString() }),
+    });
+  } catch (e) { alert("Could not set time: " + e.message); }
   refreshSystem();
 };
 

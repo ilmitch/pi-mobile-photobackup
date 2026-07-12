@@ -98,8 +98,9 @@ sudo uv run python scripts/run_appliance.py \
 
 From a browser on the same network open `http://<pi-ip>:8011`. You should see the
 dashboard. Insert a source card into the USB reader — it should appear as the Source.
-Because the Pi clock is untrusted at boot, use **Set time from this device** (the phone/
-browser time) before starting a backup, then **Dry Run → Start Backup**.
+Because the Pi clock is untrusted at boot, use **Set time from this device** — this reads
+your phone/browser clock and **sets the Pi's system time** (so dated session folders are
+correct even without an RTC) — then **Dry Run → Start Backup**.
 
 Verify independently (the ultimate check):
 
@@ -136,8 +137,12 @@ These are not yet automated by the app:
   ```
   Then reach the appliance at `http://192.168.50.1`. Consider a `.local` hostname via
   Avahi (`backup.local`).
-- **RTC** — enable the DS3231 overlay (`dtoverlay=i2c-rtc,ds3231` in `/boot/firmware/config.txt`),
-  install `i2c-tools`, and sync it once from a trusted source.
+- **RTC (optional)** — you do **not** need an RTC: the *Set time from this device* action
+  sets the Pi clock from your phone each session, and Raspberry Pi OS's `fake-hwclock`
+  keeps the time roughly sane across reboots. An RTC just avoids re-syncing after a power
+  cycle. To use one, enable the DS3231 overlay (`dtoverlay=i2c-rtc,ds3231` in
+  `/boot/firmware/config.txt`), install `i2c-tools`, and sync it once from a trusted source.
+  Keeping the appliance timezone as **UTC** is simplest (the clock is set in UTC).
 - **VNC** — `sudo raspi-config` → Interface Options → VNC, for administration.
 - **GPIO LED** — wire an LED to a GPIO pin; the LED pattern engine (`src/aethereal/led/`)
   is implemented, but the runtime loop that drives the pin from engine state is a

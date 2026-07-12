@@ -38,12 +38,16 @@ def validate_destination(
     An arbitrary disk can never stand in — matching is by UUID only.
     """
     if not configured_uuid:
-        return DestinationValidation(ok=False, device=None, reasons=("no destination UUID configured",))
+        return DestinationValidation(
+            ok=False, device=None, reasons=("no destination UUID configured",)
+        )
 
     matches = [d for d in flatten_devices(devices) if d.uuid == configured_uuid]
     if not matches:
         return DestinationValidation(
-            ok=False, device=None, reasons=(f"configured destination {configured_uuid} not present",)
+            ok=False,
+            device=None,
+            reasons=(f"configured destination {configured_uuid} not present",),
         )
     if len(matches) > 1:
         return DestinationValidation(

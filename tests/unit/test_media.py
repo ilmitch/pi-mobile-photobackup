@@ -22,20 +22,37 @@ class FakeMountService:
     ) -> SourceMount:
         self.mount_calls += 1
         return SourceMount(
-            device=device, mount_point=str(mount_point),
-            block_read_only=True, mount_read_only=True,
+            device=device,
+            mount_point=str(mount_point),
+            block_read_only=True,
+            mount_read_only=True,
         )
 
     def unmount(self, mount_point: Path) -> None:
         self.unmounted.append(str(mount_point))
 
 
-def _dev(name: str, uuid: str, *, fstype: str = "exfat", label: str | None = None,
-         mountpoint: str | None = None) -> BlockDevice:
+def _dev(
+    name: str,
+    uuid: str,
+    *,
+    fstype: str = "exfat",
+    label: str | None = None,
+    mountpoint: str | None = None,
+) -> BlockDevice:
     return BlockDevice(
-        name=name, path=f"/dev/{name}", fstype=fstype, uuid=uuid, label=label,
-        size_bytes=64_000_000_000, read_only=False, mountpoint=mountpoint,
-        dev_type="part", model=None, serial=None, partuuid=None,
+        name=name,
+        path=f"/dev/{name}",
+        fstype=fstype,
+        uuid=uuid,
+        label=label,
+        size_bytes=64_000_000_000,
+        read_only=False,
+        mountpoint=mountpoint,
+        dev_type="part",
+        model=None,
+        serial=None,
+        partuuid=None,
     )
 
 

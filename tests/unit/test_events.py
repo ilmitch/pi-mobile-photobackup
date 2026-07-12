@@ -6,9 +6,7 @@ from aethereal.common.events import Event, EventBus, EventSeverity, EventType
 
 
 def _publish(bus: EventBus, message: str) -> Event:
-    return bus.publish(
-        EventType.SYSTEM_STATE_CHANGED, EventSeverity.INFO, "backupd", message
-    )
+    return bus.publish(EventType.SYSTEM_STATE_CHANGED, EventSeverity.INFO, "backupd", message)
 
 
 def test_sequences_are_monotonic() -> None:

@@ -45,7 +45,9 @@ class _FakeMount:
     def mount_source_read_only(
         self, device: str, mount_point: Path, *, fstype: str | None
     ) -> SourceMount:
-        return SourceMount(device, str(self._source_dir), block_read_only=True, mount_read_only=True)
+        return SourceMount(
+            device, str(self._source_dir), block_read_only=True, mount_read_only=True
+        )
 
     def unmount(self, mount_point: Path) -> None:
         return None
@@ -53,16 +55,34 @@ class _FakeMount:
 
 def _card() -> BlockDevice:
     return BlockDevice(
-        name="sda1", path="/dev/sda1", fstype="exfat", uuid="card-uuid", label="CANON_R6",
-        size_bytes=64_000_000_000, read_only=False, mountpoint=None, dev_type="part",
-        model=None, serial=None, partuuid=None,
+        name="sda1",
+        path="/dev/sda1",
+        fstype="exfat",
+        uuid="card-uuid",
+        label="CANON_R6",
+        size_bytes=64_000_000_000,
+        read_only=False,
+        mountpoint=None,
+        dev_type="part",
+        model=None,
+        serial=None,
+        partuuid=None,
     )
 
 
 _DEST = BlockDevice(
-    name="sdb1", path="/dev/sdb1", fstype="ext4", uuid=DEST_UUID, label="AETHEREAL",
-    size_bytes=2_000_000_000_000, read_only=False, mountpoint="/Backups", dev_type="part",
-    model=None, serial=None, partuuid=None,
+    name="sdb1",
+    path="/dev/sdb1",
+    fstype="ext4",
+    uuid=DEST_UUID,
+    label="AETHEREAL",
+    size_bytes=2_000_000_000_000,
+    read_only=False,
+    mountpoint="/Backups",
+    dev_type="part",
+    model=None,
+    serial=None,
+    partuuid=None,
 )
 
 

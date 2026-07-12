@@ -1,5 +1,7 @@
 # Aethereal Mobile Backup Appliance
 
+[![CI](https://github.com/ilmitch/pi-mobile-photobackup/actions/workflows/ci.yml/badge.svg)](https://github.com/ilmitch/pi-mobile-photobackup/actions/workflows/ci.yml)
+
 Field backup engine for photography and drone media. See `PRD/` for the product,
 implementation, and verification specifications.
 

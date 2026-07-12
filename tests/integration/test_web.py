@@ -98,17 +98,35 @@ class _FakeMountService:
 
 def _card(name: str, uuid: str, label: str) -> BlockDevice:
     return BlockDevice(
-        name=name, path=f"/dev/{name}", fstype="exfat", uuid=uuid, label=label,
-        size_bytes=64_000_000_000, read_only=False, mountpoint=None, dev_type="part",
-        model=None, serial=None, partuuid=None,
+        name=name,
+        path=f"/dev/{name}",
+        fstype="exfat",
+        uuid=uuid,
+        label=label,
+        size_bytes=64_000_000_000,
+        read_only=False,
+        mountpoint=None,
+        dev_type="part",
+        model=None,
+        serial=None,
+        partuuid=None,
     )
 
 
 _DEST_UUID = "dest-ssd-uuid"
 _DEST_DEV = BlockDevice(
-    name="sdb1", path="/dev/sdb1", fstype="ext4", uuid=_DEST_UUID, label="AETHEREAL",
-    size_bytes=2_000_000_000_000, read_only=False, mountpoint="/Backups", dev_type="part",
-    model=None, serial=None, partuuid=None,
+    name="sdb1",
+    path="/dev/sdb1",
+    fstype="ext4",
+    uuid=_DEST_UUID,
+    label="AETHEREAL",
+    size_bytes=2_000_000_000_000,
+    read_only=False,
+    mountpoint="/Backups",
+    dev_type="part",
+    model=None,
+    serial=None,
+    partuuid=None,
 )
 
 
@@ -156,12 +174,17 @@ def test_status_and_system(tmp_path: Path) -> None:
 def test_system_includes_watch_telemetry(tmp_path: Path) -> None:
     def reader(_path: str) -> Telemetry:
         return Telemetry(
-            cpu_temperature_celsius=82.0, undervoltage=True, cpu_percent=5.0,
-            memory_percent=10.0, storage_free_bytes=100, storage_total_bytes=1000,
+            cpu_temperature_celsius=82.0,
+            undervoltage=True,
+            cpu_percent=5.0,
+            memory_percent=10.0,
+            storage_free_bytes=100,
+            storage_total_bytes=1000,
         )
 
     watch = WatchService(
-        thermal_warning_celsius=75, storage_critical_bytes=1_000_000_000,
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1_000_000_000,
         telemetry_reader=reader,
     )
     watch.clock.mark_phone_synced()
@@ -177,7 +200,8 @@ def test_system_includes_watch_telemetry(tmp_path: Path) -> None:
 
 def test_time_sync_marks_clock_trusted(tmp_path: Path) -> None:
     watch = WatchService(
-        thermal_warning_celsius=75, storage_critical_bytes=1,
+        thermal_warning_celsius=75,
+        storage_critical_bytes=1,
         telemetry_reader=lambda _p: Telemetry(None, None, 1.0, 1.0, 1, 1),
     )
     app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}), watch=watch)

@@ -108,9 +108,7 @@ _ALLOWED: dict[BackupState, frozenset[BackupState]] = {
     # A blocked preflight must be able to rescan (after the user frees space or swaps the
     # SSD) or be abandoned. PRE-008 forbids *overriding* a capacity block, not rescanning.
     # See Implementation Plan v0.3 section 7.
-    BackupState.PREFLIGHT_BLOCKED: frozenset(
-        {BackupState.PREFLIGHT_SCANNING, BackupState.IDLE}
-    ),
+    BackupState.PREFLIGHT_BLOCKED: frozenset({BackupState.PREFLIGHT_SCANNING, BackupState.IDLE}),
     BackupState.BACKUP_QUEUED: frozenset(
         {BackupState.BACKUP_COPYING, BackupState.BACKUP_CANCELLED}
     ),
@@ -136,9 +134,7 @@ _ALLOWED: dict[BackupState, frozenset[BackupState]] = {
         {BackupState.BACKUP_CANCELLED, BackupState.RECOVERY_REQUIRED}
     ),
     BackupState.BACKUP_COMPLETED: frozenset({BackupState.SOURCE_SAFE_TO_REMOVE}),
-    BackupState.BACKUP_COMPLETED_WITH_WARNINGS: frozenset(
-        {BackupState.SOURCE_SAFE_TO_REMOVE}
-    ),
+    BackupState.BACKUP_COMPLETED_WITH_WARNINGS: frozenset({BackupState.SOURCE_SAFE_TO_REMOVE}),
     BackupState.BACKUP_CANCELLED: frozenset(
         {BackupState.SOURCE_SAFE_TO_REMOVE, BackupState.PREFLIGHT_SCANNING}
     ),

@@ -55,18 +55,14 @@ def test_destination_uses_wal_and_synchronous_full(tmp_path: Path) -> None:
 def test_content_identity_unique_index_enforced(tmp_path: Path) -> None:
     conn = open_destination_manifest(tmp_path / "manifest.sqlite3")
     try:
-        conn.execute(
-            "INSERT INTO content_identity (size_bytes, sha256) VALUES (?, ?)", (10, "abc")
-        )
+        conn.execute("INSERT INTO content_identity (size_bytes, sha256) VALUES (?, ?)", (10, "abc"))
         with pytest.raises(sqlite3.IntegrityError):
             conn.execute(
                 "INSERT INTO content_identity (size_bytes, sha256) VALUES (?, ?)",
                 (10, "abc"),
             )
         # Same hash, different size is a distinct identity and must be allowed.
-        conn.execute(
-            "INSERT INTO content_identity (size_bytes, sha256) VALUES (?, ?)", (11, "abc")
-        )
+        conn.execute("INSERT INTO content_identity (size_bytes, sha256) VALUES (?, ?)", (11, "abc"))
     finally:
         conn.close()
 

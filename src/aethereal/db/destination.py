@@ -191,9 +191,7 @@ def open_destination_manifest(
     one connection (WAL permits a concurrent reader with the single writer).
     """
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(
-        str(path), isolation_level=None, check_same_thread=check_same_thread
-    )
+    conn = sqlite3.connect(str(path), isolation_level=None, check_same_thread=check_same_thread)
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute(f"PRAGMA synchronous={synchronous}")
     conn.execute("PRAGMA foreign_keys=ON")

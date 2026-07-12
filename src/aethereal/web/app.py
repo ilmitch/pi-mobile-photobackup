@@ -18,28 +18,27 @@ import time
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from pathlib import Path
 
 import psutil
 from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
 
 from aethereal.backup.engine import BackupEngine
 from aethereal.backup.state_machine import BackupState
 from aethereal.common.events import Event, EventBus
+from aethereal.common.source import SourceRef
 from aethereal.db.manifest_repo import ManifestRepository
-
-
-@dataclass(frozen=True, slots=True)
-class SourceRef:
-    """The currently active source presented to the appliance."""
-
-    root: Path
-    logical_name: str
-
+from aethereal.linux.media import MediaManager
 
 SourceProvider = Callable[[], "SourceRef | None"]
+
+
+class MediaSelectRequest(BaseModel):
+    """Body for choosing the active source when several cards are present (SRC-008)."""
+
+    uuid: str
 
 
 class NoSourceError(Exception):
@@ -110,6 +109,7 @@ def create_app(
     source_provider: SourceProvider,
     event_bus: EventBus | None = None,
     api_token: str | None = None,
+    media_manager: MediaManager | None = None,
 ) -> FastAPI:
     service = BackupService(engine, source_provider)
 
@@ -165,6 +165,34 @@ def create_app(
             # Backed-up bytes as of the last scan (None until a dry run / backup).
             "backed_up_bytes": engine.last_source_scan(src.root),
         }
+
+    @app.get("/api/v1/media")
+    async def media() -> dict[str, object]:
+        if media_manager is None:
+            return {"managed": False, "state": "UNMANAGED", "candidates": []}
+        return {
+            "managed": True,
+            "state": media_manager.state().value,
+            "candidates": [
+                {
+                    "uuid": c.uuid,
+                    "name": c.name,
+                    "label": c.label,
+                    "fstype": c.fstype,
+                    "size_bytes": c.size_bytes,
+                }
+                for c in media_manager.source_candidates()
+            ],
+        }
+
+    @app.post("/api/v1/media/select", status_code=202)
+    async def media_select(
+        body: MediaSelectRequest, _auth: None = Depends(require_auth)
+    ) -> dict[str, object]:
+        if media_manager is None:
+            raise HTTPException(status_code=409, detail="media selection not available")
+        media_manager.select(body.uuid)
+        return {"selected": body.uuid}
 
     @app.get("/api/v1/destination")
     async def destination() -> dict[str, object]:

@@ -14,8 +14,12 @@ from aethereal.backup.engine import BackupEngine
 from aethereal.common.events import EventBus, EventSeverity, EventType
 from aethereal.common.platform import DiskUsage, FakePlatformOps, PlatformOps
 from aethereal.db.destination import open_destination_manifest
+from aethereal.common.source import SourceRef
 from aethereal.db.manifest_repo import ManifestRepository
-from aethereal.web.app import SourceRef, create_app
+from aethereal.linux.devices import BlockDevice
+from aethereal.linux.media import MediaManager
+from aethereal.linux.mount import SourceMount
+from aethereal.web.app import create_app
 
 BIG = FakePlatformOps(total_bytes=1_000_000_000_000, free_bytes=1_000_000_000_000)
 FIXED_CLOCK = lambda: datetime(2026, 7, 11, 12, 0, 0, tzinfo=timezone.utc)  # noqa: E731
@@ -52,6 +56,7 @@ def _build(
     bus: EventBus | None = None,
     token: str | None = None,
     platform: PlatformOps | None = None,
+    media_manager: MediaManager | None = None,
 ) -> FastAPI:
     conn = open_destination_manifest(
         tmp_path / "Backups" / "manifest.sqlite3", check_same_thread=False
@@ -65,14 +70,42 @@ def _build(
         event_bus=bus,
         clock=FIXED_CLOCK,
     )
+    provider: object = media_manager.current_source if media_manager else (lambda: source)
     app = create_app(
         engine=engine,
         repo=repo,
-        source_provider=lambda: source,
+        source_provider=provider,  # type: ignore[arg-type]
         event_bus=bus,
         api_token=token,
+        media_manager=media_manager,
     )
     return app
+
+
+class _FakeMountService:
+    def mount_source_read_only(
+        self, device: str, mount_point: Path, *, fstype: str | None
+    ) -> SourceMount:
+        return SourceMount(device, str(mount_point), block_read_only=True, mount_read_only=True)
+
+    def unmount(self, mount_point: Path) -> None:
+        return None
+
+
+def _card(name: str, uuid: str, label: str) -> BlockDevice:
+    return BlockDevice(
+        name=name, path=f"/dev/{name}", fstype="exfat", uuid=uuid, label=label,
+        size_bytes=64_000_000_000, read_only=False, mountpoint=None, dev_type="part",
+        model=None, serial=None, partuuid=None,
+    )
+
+
+_DEST_UUID = "dest-ssd-uuid"
+_DEST_DEV = BlockDevice(
+    name="sdb1", path="/dev/sdb1", fstype="ext4", uuid=_DEST_UUID, label="AETHEREAL",
+    size_bytes=2_000_000_000_000, read_only=False, mountpoint="/Backups", dev_type="part",
+    model=None, serial=None, partuuid=None,
+)
 
 
 def _source(tmp_path: Path, files: dict[str, bytes]) -> SourceRef:
@@ -240,6 +273,52 @@ def test_system_actions_require_auth_when_token_set(tmp_path: Path) -> None:
     app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}), token="secret")
     with TestClient(app) as client:
         assert client.post("/api/v1/system/shutdown").status_code == 401
+
+
+def test_media_wiring_detect_select_remove(tmp_path: Path) -> None:
+    devices: list[BlockDevice] = [_DEST_DEV]
+    manager = MediaManager(
+        destination_uuid=_DEST_UUID,
+        source_mount_root=tmp_path / "src",
+        device_lister=lambda: list(devices),
+        mount_service=_FakeMountService(),
+    )
+    app = _build(tmp_path, source=None, media_manager=manager)
+    with TestClient(app) as client:
+        # No card inserted.
+        assert client.get("/api/v1/media").json()["state"] == "NO_SOURCE"
+        assert client.get("/api/v1/source").json() == {"present": False}
+
+        # Insert one card -> detected and exposed as the active source.
+        devices.append(_card("sda1", "card-uuid", "CANON_R6"))
+        media = client.get("/api/v1/media").json()
+        assert media["state"] == "SINGLE_SOURCE"
+        assert media["candidates"][0]["uuid"] == "card-uuid"
+        src = client.get("/api/v1/source").json()
+        assert src["present"] is True
+        assert src["logical_name"] == "CANON_R6"
+
+        # Insert a second card -> ambiguous until the user selects one (SRC-008).
+        devices.append(_card("sdc1", "card-b", "DJI_MINI"))
+        assert client.get("/api/v1/media").json()["state"] == "MULTIPLE_SOURCES"
+        assert client.get("/api/v1/source").json() == {"present": False}
+
+        assert client.post("/api/v1/media/select", json={"uuid": "card-b"}).status_code == 202
+        assert client.get("/api/v1/source").json()["logical_name"] == "DJI_MINI"
+
+        # Remove all cards.
+        devices[:] = [_DEST_DEV]
+        assert client.get("/api/v1/media").json()["state"] == "NO_SOURCE"
+        assert client.get("/api/v1/source").json() == {"present": False}
+
+
+def test_media_endpoint_unmanaged_without_manager(tmp_path: Path) -> None:
+    app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}))
+    with TestClient(app) as client:
+        body = client.get("/api/v1/media").json()
+        assert body["managed"] is False
+        assert body["state"] == "UNMANAGED"
+        assert client.post("/api/v1/media/select", json={"uuid": "x"}).status_code == 409
 
 
 def test_cancel_with_no_active_backup_409(tmp_path: Path) -> None:

@@ -31,8 +31,9 @@ from aethereal.backup.engine import BackupEngine
 from aethereal.common.events import EventBus
 from aethereal.common.platform import FakePlatformOps, LocalPlatformOps, PlatformOps
 from aethereal.db.destination import open_destination_manifest
+from aethereal.common.source import SourceRef
 from aethereal.db.manifest_repo import ManifestRepository
-from aethereal.web.app import SourceRef, create_app
+from aethereal.web.app import create_app
 
 
 def _make_engine(

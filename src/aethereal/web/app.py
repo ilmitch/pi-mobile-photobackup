@@ -18,7 +18,6 @@ import time
 from collections.abc import AsyncIterator, Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from pathlib import Path
 
 import psutil
@@ -28,16 +27,8 @@ from fastapi.responses import HTMLResponse
 from aethereal.backup.engine import BackupEngine
 from aethereal.backup.state_machine import BackupState
 from aethereal.common.events import Event, EventBus
+from aethereal.common.source import SourceRef
 from aethereal.db.manifest_repo import ManifestRepository
-
-
-@dataclass(frozen=True, slots=True)
-class SourceRef:
-    """The currently active source presented to the appliance."""
-
-    root: Path
-    logical_name: str
-
 
 SourceProvider = Callable[[], "SourceRef | None"]
 

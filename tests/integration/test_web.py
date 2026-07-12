@@ -14,8 +14,9 @@ from aethereal.backup.engine import BackupEngine
 from aethereal.common.events import EventBus, EventSeverity, EventType
 from aethereal.common.platform import DiskUsage, FakePlatformOps, PlatformOps
 from aethereal.db.destination import open_destination_manifest
+from aethereal.common.source import SourceRef
 from aethereal.db.manifest_repo import ManifestRepository
-from aethereal.web.app import SourceRef, create_app
+from aethereal.web.app import create_app
 
 BIG = FakePlatformOps(total_bytes=1_000_000_000_000, free_bytes=1_000_000_000_000)
 FIXED_CLOCK = lambda: datetime(2026, 7, 11, 12, 0, 0, tzinfo=timezone.utc)  # noqa: E731

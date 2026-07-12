@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from aethereal.linux.devices import list_block_devices
+from aethereal.linux.media import LinuxMountService, MediaManager
 from aethereal.linux.mount import (
     SourceProtectionFailure,
     effective_read_only,
@@ -61,8 +62,9 @@ def _detach(loop: str) -> None:
 
 
 def _uuid_of(device: str) -> str:
+    # -p probes the superblock directly (no stale cache across loop-device reuse).
     return subprocess.run(
-        ["blkid", "-s", "UUID", "-o", "value", device],
+        ["blkid", "-p", "-s", "UUID", "-o", "value", device],
         check=True, capture_output=True, text=True,
     ).stdout.strip()
 
@@ -136,6 +138,27 @@ def test_ext4_destination_validates_end_to_end(ext4_loop: str, tmp_path: Path) -
         assert result.device.fstype == "ext4"
     finally:
         unmount(mount_point)
+
+
+def test_media_manager_mounts_real_source_read_only(vfat_loop: str, tmp_path: Path) -> None:
+    # End-to-end: the media manager detects our loop card, mounts it read-only, and the
+    # SourceRef it returns is a read-only tree (writes fail). Scoped to our device.
+    def lister() -> list:  # type: ignore[type-arg]
+        return [d for d in list_block_devices() if d.path == vfat_loop]
+
+    manager = MediaManager(
+        destination_uuid="not-present",
+        source_mount_root=tmp_path / "src",
+        device_lister=lister,
+        mount_service=LinuxMountService(),
+    )
+    try:
+        ref = manager.current_source()
+        assert ref is not None
+        with pytest.raises(OSError):
+            (ref.root / "should_not_write").write_bytes(b"nope")
+    finally:
+        manager.eject_all()
 
 
 def test_source_protection_failure_type_exists() -> None:

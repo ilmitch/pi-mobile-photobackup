@@ -102,10 +102,15 @@ def parse_lsblk_json(data: Mapping[str, object]) -> list[BlockDevice]:
 
 
 def _blkid_probe(path: str) -> dict[str, str]:
-    """Probe a device directly with ``blkid`` (works without a running udevd)."""
+    """Probe a device's superblock directly with ``blkid -p``.
+
+    ``-p`` (low-level probe) bypasses the blkid cache, so it reports the *current*
+    filesystem even when a device path is reused by different media (removable-card
+    hotplug), and works without a running udevd (e.g. in containers).
+    """
     try:
         output = subprocess.run(
-            ["blkid", "-o", "export", path],
+            ["blkid", "-p", "-o", "export", path],
             check=True, capture_output=True, text=True,
         ).stdout
     except (subprocess.CalledProcessError, FileNotFoundError):

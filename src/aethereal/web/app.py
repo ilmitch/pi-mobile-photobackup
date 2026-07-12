@@ -31,6 +31,7 @@ from aethereal.common.events import Event, EventBus
 from aethereal.common.source import SourceRef
 from aethereal.db.manifest_repo import ManifestRepository
 from aethereal.linux.media import MediaManager
+from aethereal.watch.service import WatchService
 
 SourceProvider = Callable[[], "SourceRef | None"]
 
@@ -110,6 +111,7 @@ def create_app(
     event_bus: EventBus | None = None,
     api_token: str | None = None,
     media_manager: MediaManager | None = None,
+    watch: WatchService | None = None,
 ) -> FastAPI:
     service = BackupService(engine, source_provider)
 
@@ -211,13 +213,28 @@ def create_app(
     @app.get("/api/v1/system")
     async def system() -> dict[str, object]:
         boot = _metric(psutil.boot_time)
-        return {
+        status: dict[str, object] = {
             "uptime_seconds": (time.time() - boot) if boot is not None else None,
             "cpu_percent": _metric(lambda: psutil.cpu_percent(interval=None)),
             "memory_percent": _metric(lambda: psutil.virtual_memory().percent),
             "engine_state": engine.state.value,
             "backup_running": service.is_running(),
         }
+        if watch is not None:
+            health = watch.snapshot()
+            status.update(
+                {
+                    "cpu_temperature_celsius": health.telemetry.cpu_temperature_celsius,
+                    "undervoltage": health.telemetry.undervoltage,
+                    "storage_free_bytes": health.telemetry.storage_free_bytes,
+                    "storage_total_bytes": health.telemetry.storage_total_bytes,
+                    "clock_state": health.clock_state.value,
+                    "warnings": [
+                        {"kind": w.kind.value, "message": w.message} for w in health.warnings
+                    ],
+                }
+            )
+        return status
 
     @app.get("/api/v1/backups")
     async def backups() -> dict[str, object]:

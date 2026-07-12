@@ -22,6 +22,7 @@ from aethereal.db.destination import open_destination_manifest
 from aethereal.db.manifest_repo import ManifestRepository
 from aethereal.linux.devices import BlockDevice
 from aethereal.linux.media import MediaManager, MountService
+from aethereal.watch.service import WatchService
 from aethereal.web.app import create_app
 
 
@@ -68,6 +69,11 @@ def build_appliance(
         **manager_kwargs,  # type: ignore[arg-type]
     )
 
+    watch = WatchService(
+        thermal_warning_celsius=config.thermal.warning_celsius,
+        storage_critical_bytes=config.system_storage.critical_free_bytes,
+    )
+
     app = create_app(
         engine=engine,
         repo=repo,
@@ -75,6 +81,7 @@ def build_appliance(
         event_bus=bus,
         api_token=api_token,
         media_manager=manager,
+        watch=watch,
     )
     # Keep long-lived handles reachable (and available to tests).
     app.state.engine = engine

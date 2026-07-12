@@ -33,7 +33,14 @@ from aethereal.common.platform import FakePlatformOps, LocalPlatformOps, Platfor
 from aethereal.db.destination import open_destination_manifest
 from aethereal.common.source import SourceRef
 from aethereal.db.manifest_repo import ManifestRepository
+from aethereal.watch.service import WatchService
 from aethereal.web.app import create_app
+
+
+def _demo_watch() -> WatchService:
+    watch = WatchService(thermal_warning_celsius=75, storage_critical_bytes=1_000_000_000)
+    watch.clock.mark_network_synced()  # the dev host has a real clock
+    return watch
 
 
 def _make_engine(
@@ -69,7 +76,7 @@ def build_real_app(source_root: Path, backup_root: Path, logical_name: str) -> o
     engine, repo, bus = _make_engine(backup_root, platform=LocalPlatformOps())
     source = SourceRef(root=source_root, logical_name=logical_name)
     return create_app(
-        engine=engine, repo=repo, source_provider=lambda: source, event_bus=bus
+        engine=engine, repo=repo, source_provider=lambda: source, event_bus=bus, watch=_demo_watch()
     )
 
 
@@ -107,7 +114,7 @@ def build_demo_app() -> tuple[object, Path]:
 
     source = SourceRef(root=card, logical_name="DEMO_CARD_01")
     app = create_app(
-        engine=engine, repo=repo, source_provider=lambda: source, event_bus=bus
+        engine=engine, repo=repo, source_provider=lambda: source, event_bus=bus, watch=_demo_watch()
     )
     return app, work
 

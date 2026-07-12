@@ -19,6 +19,8 @@ from aethereal.db.manifest_repo import ManifestRepository
 from aethereal.linux.devices import BlockDevice
 from aethereal.linux.media import MediaManager
 from aethereal.linux.mount import SourceMount
+from aethereal.watch.service import WatchService
+from aethereal.watch.telemetry import Telemetry
 from aethereal.web.app import create_app
 
 BIG = FakePlatformOps(total_bytes=1_000_000_000_000, free_bytes=1_000_000_000_000)
@@ -57,6 +59,7 @@ def _build(
     token: str | None = None,
     platform: PlatformOps | None = None,
     media_manager: MediaManager | None = None,
+    watch: WatchService | None = None,
 ) -> FastAPI:
     conn = open_destination_manifest(
         tmp_path / "Backups" / "manifest.sqlite3", check_same_thread=False
@@ -78,6 +81,7 @@ def _build(
         event_bus=bus,
         api_token=token,
         media_manager=media_manager,
+        watch=watch,
     )
     return app
 
@@ -147,6 +151,36 @@ def test_status_and_system(tmp_path: Path) -> None:
         system = client.get("/api/v1/system").json()
         assert "uptime_seconds" in system
         assert system["engine_state"] == "IDLE"
+
+
+def test_system_includes_watch_telemetry(tmp_path: Path) -> None:
+    def reader(_path: str) -> Telemetry:
+        return Telemetry(
+            cpu_temperature_celsius=82.0, undervoltage=True, cpu_percent=5.0,
+            memory_percent=10.0, storage_free_bytes=100, storage_total_bytes=1000,
+        )
+
+    watch = WatchService(
+        thermal_warning_celsius=75, storage_critical_bytes=1_000_000_000,
+        telemetry_reader=reader,
+    )
+    watch.clock.mark_phone_synced()
+    app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}), watch=watch)
+    with TestClient(app) as client:
+        body = client.get("/api/v1/system").json()
+        assert body["cpu_temperature_celsius"] == 82.0
+        assert body["undervoltage"] is True
+        assert body["clock_state"] == "CLOCK_PHONE_SYNCED"
+        kinds = {w["kind"] for w in body["warnings"]}
+        assert {"THERMAL", "POWER", "STORAGE"} <= kinds
+
+
+def test_system_without_watch_omits_health_fields(tmp_path: Path) -> None:
+    app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}))
+    with TestClient(app) as client:
+        body = client.get("/api/v1/system").json()
+        assert "clock_state" not in body
+        assert "warnings" not in body
 
 
 def test_system_endpoint_survives_blocked_telemetry(

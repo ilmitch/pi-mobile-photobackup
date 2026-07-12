@@ -57,6 +57,12 @@ strict = true
 files = ["src", "tests"]
 plugins = ["pydantic.mypy"]
 
+# Raspberry Pi-only dependencies (the `pi` optional group) are not installed in the dev
+# environment; their imports are lazy and Pi-only.
+[[tool.mypy.overrides]]
+module = ["gpiozero.*", "pyudev.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"

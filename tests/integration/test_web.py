@@ -163,6 +163,7 @@ def test_status_and_system(tmp_path: Path) -> None:
     with TestClient(app) as client:
         status = client.get("/api/v1/status").json()
         assert status["state"] == "IDLE"
+        assert status["led_state"] == "READY"  # IDLE -> READY heartbeat (LED-005)
         assert status["backup_running"] is False
         assert status["source"]["logical_name"] == "CANON_CARD_01"
 

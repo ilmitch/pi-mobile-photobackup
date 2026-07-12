@@ -7,24 +7,30 @@ Develop on macOS (portable core); deploy on Raspberry Pi 4 (Raspberry Pi OS, Pyt
 
 ## Status
 
-The **portable, correctness-critical core is implemented and tested** (ruff + mypy
-`--strict` clean, full suite green on macOS and in the Linux container):
+**Implemented and tested** (ruff + mypy `--strict` clean; full suite green on macOS and in
+the Linux container; real-filesystem loopback tests in the privileged container):
 
 - Backup engine: preflight, planner, copy / three-way verify / durable finalize,
   content-addressed dedup, crash recovery, cancellation, job state machine, event bus
 - SQLite destination manifest (WAL + `synchronous=FULL`) with explicit migrations
 - FastAPI REST + WebSocket API and a mobile-first web UI
+- Linux platform layer (`src/aethereal/linux/`): block-device + mount **read-only
+  enforcement** with effective-state verification (SRC-001/002), device identity via
+  `lsblk`/`blkid`, destination **UUID + ext4 validation** (DST-001/002/004), and a media
+  manager for source detection and the read-only mount lifecycle (SRC-008)
+- Appliance composition root (`src/aethereal/appliance.py`) assembling the full stack from
+  config, plus a Raspberry Pi runtime entrypoint (`scripts/run_appliance.py`)
 
-The **Raspberry Pi appliance layer is specified but not yet implemented**:
+**Specified but not yet implemented** (remaining Pi provisioning and peripherals):
 
-- Linux platform integration: udev media detection, read-only source mount + effective
-  validation, ext4/UUID destination validation
+- Live `udev` hotplug monitoring (source detection is currently an on-demand scan)
 - LED status service and the power/thermal/clock-trust watcher (`src/aethereal/led/`,
   `watch/`, `update/` are currently placeholder packages)
-- systemd units, Wi-Fi access point, the installer, and GitHub Actions CI/CD
+- systemd units, Wi-Fi access point, VNC/RTC provisioning, the installer, and GitHub
+  Actions CI/CD
 
-`PRD/` holds the full v1 **specification/target**; this repository currently implements
-the portable core described above, not the complete appliance.
+`PRD/` holds the full v1 **specification/target**; this repository implements the backup
+engine, web control surface, and Linux platform layer described above.
 
 ## Development
 

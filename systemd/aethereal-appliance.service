@@ -1,0 +1,21 @@
+[Unit]
+Description=Aethereal Mobile Backup appliance
+Documentation=https://github.com/ilmitch/pi-mobile-photobackup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Root (or CAP_SYS_ADMIN) is required for read-only mounting, blockdev, and blkid probing
+# of removable media. Harden later with a dedicated user + capabilities/polkit.
+User=root
+WorkingDirectory=/opt/pi-mobile-photobackup
+Environment=UV_PROJECT_ENVIRONMENT=/opt/pi-mobile-photobackup/.venv
+ExecStart=/usr/local/bin/uv run python scripts/run_appliance.py \
+    --config /etc/aethereal-backup/config.yaml \
+    --host 0.0.0.0 --port 80
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

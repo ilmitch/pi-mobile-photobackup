@@ -76,3 +76,9 @@ docker compose run --rm privileged pytest -q
 
 GPIO (the `pi` optional dependency group) is Raspberry Pi hardware only and is excluded
 from the container.
+
+## Deploying to a Raspberry Pi
+
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for the full bring-up guide: hardware,
+OS, formatting the ext4 destination, configuration, first backup, and running as a
+systemd service ([systemd/aethereal-appliance.service](systemd/aethereal-appliance.service)).

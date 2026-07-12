@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+dist/
+build/
+
+# uv
+# (uv.lock IS committed; the venv is not)
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local runtime / appliance state (never commit backup data or secrets)
+*.db
+*.sqlite3
+*.aethereal-partial
+/Backups/
+config/local.yaml
+
+# OS
+.DS_Store

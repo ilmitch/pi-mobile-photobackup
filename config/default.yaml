@@ -1,0 +1,56 @@
+device:
+  hostname: backup.local
+
+network:
+  ssid: Aethereal-Backup
+  static_ip: 192.168.50.1
+  interface: wlan0
+
+destination:
+  filesystem_uuid: ""
+  required_filesystem: ext4
+  backup_root: /Backups
+  object_store_root: /Backups/.aethereal/objects/sha256
+  manifest_path: /Backups/.aethereal/manifest.sqlite3
+  safety_margin_percent: 5
+  safety_margin_min_bytes: 10000000000
+
+source:
+  mount_root: /run/aethereal/source
+  supported_filesystems:
+    - vfat
+    - exfat
+  block_device_read_only: true
+  read_only_mount: true
+
+backup:
+  partial_suffix: .aethereal-partial
+  hash_algorithm: sha256
+  verification_retries: 2
+  single_active_source: true
+  strict_source_hashing: true
+  io_worker_count: 1
+  io_chunk_bytes: 8388608
+  destination_cache_evict: true
+  direct_io_verify: false
+
+database:
+  appliance_path: /var/lib/aethereal-backup/appliance.db
+  destination_wal: true
+  destination_synchronous: FULL
+
+logging:
+  path: /var/log/aethereal-backup
+  retention_days: 30
+
+thermal:
+  warning_celsius: 75
+
+time:
+  require_trusted_clock: true
+  rtc_profile: ds3231
+  allow_phone_sync: true
+  max_clock_skew_seconds: 300
+
+system_storage:
+  critical_free_bytes: 1000000000

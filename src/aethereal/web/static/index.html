@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Aethereal Backup</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1a1c1e; --muted: #626a72;
+    --line: #e3e6ea; --accent: #2f6fed; --ok: #1f9d55; --warn: #b26a00; --err: #c0392b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a; --card: #1d2026; --text: #eef1f4; --muted: #9aa4af;
+      --line: #2b2f36; --accent: #5b8dff; --ok: #37c871; --warn: #e0a33a; --err: #ff6b5e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: env(safe-area-inset-top) 0 2rem;
+  }
+  header {
+    position: sticky; top: 0; background: var(--card); border-bottom: 1px solid var(--line);
+    padding: .9rem 1rem; display: flex; align-items: center; gap: .6rem; z-index: 5;
+  }
+  header h1 { font-size: 1.05rem; margin: 0; font-weight: 650; }
+  main { max-width: 640px; margin: 0 auto; padding: 1rem; display: grid; gap: 1rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 1rem; }
+  .card h2 { font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 0 0 .7rem; }
+  .badge { margin-left: auto; font-size: .74rem; font-weight: 650; padding: .25rem .55rem; border-radius: 999px; background: var(--line); color: var(--text); }
+  .badge.run { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+  .row { display: flex; justify-content: space-between; gap: 1rem; padding: .3rem 0; }
+  .row .k { color: var(--muted); } .row .v { font-variant-numeric: tabular-nums; text-align: right; }
+  .actions { display: flex; gap: .6rem; flex-wrap: wrap; }
+  button {
+    flex: 1 1 auto; min-height: 46px; border: 0; border-radius: 12px; font-size: .95rem; font-weight: 600;
+    background: var(--accent); color: #fff; cursor: pointer;
+  }
+  button.secondary { background: var(--line); color: var(--text); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; margin-top: .5rem; display: flex; }
+  .bar > span { flex: none; height: 100%; width: 0; background: var(--accent); transition: width .2s ease; }
+  #src-bar-backed { background: var(--ok); }
+  #src-bar-needs { background: #ef4444; }
+  .swatch { display: inline-block; width: .6rem; height: .6rem; border-radius: 2px; vertical-align: middle; }
+  .muted { color: var(--muted); }
+  .log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; max-height: 200px; overflow-y: auto; }
+  .log div { padding: .1rem 0; border-bottom: 1px solid var(--line); }
+  table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  th, td { text-align: left; padding: .4rem .3rem; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; }
+  .dot { display: inline-block; width: .55rem; height: .55rem; border-radius: 50%; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex;
+    align-items: center; justify-content: center; z-index: 50; padding: 1.2rem; }
+  .modal-box { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 1.3rem; max-width: 360px; width: 100%; }
+  .modal-box p { margin: 0 0 1.2rem; }
+  .modal-actions { display: flex; gap: .6rem; }
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="conn" style="background: var(--muted)"></span>
+  <h1>Aethereal Backup</h1>
+  <span class="badge" id="state">…</span>
+</header>
+
+<main>
+  <section class="card" id="source-card">
+    <h2>Source</h2>
+    <div class="row"><span class="k">Card</span><span class="v" id="src-name">—</span></div>
+    <div class="row"><span class="k">Path</span><span class="v muted" id="src-path">—</span></div>
+    <div class="row"><span class="k">Used / Total</span><span class="v" id="src-cap">—</span></div>
+    <div class="bar"><span id="src-bar-backed"></span><span id="src-bar-needs"></span></div>
+    <div class="muted" id="src-legend" style="font-size:.78rem; margin-top:.45rem;">—</div>
+  </section>
+
+  <section class="card" id="dest-card">
+    <h2>Destination</h2>
+    <div class="row"><span class="k">Path</span><span class="v muted" id="dest-path">—</span></div>
+    <div class="row"><span class="k">Free / Total</span><span class="v" id="dest-cap">—</span></div>
+    <div class="bar"><span id="dest-bar"></span></div>
+    <div class="row" style="margin-top:.5rem"><span class="k">Backed up</span><span class="v" id="dest-backed">—</span></div>
+  </section>
+
+  <section class="card">
+    <h2>Actions</h2>
+    <div class="actions">
+      <button class="secondary" id="btn-dry">Dry Run</button>
+      <button id="btn-start">Start Backup</button>
+      <button id="btn-cancel" style="display:none; background: var(--err);">Cancel</button>
+    </div>
+    <div id="dry" style="display:none; margin-top: .8rem;">
+      <div class="row"><span class="k">New files</span><span class="v" id="dry-new">—</span></div>
+      <div class="row"><span class="k">Already backed up</span><span class="v" id="dry-dup">—</span></div>
+      <div class="row"><span class="k">New content</span><span class="v" id="dry-bytes">—</span></div>
+      <div class="row"><span class="k">Required / Available</span><span class="v" id="dry-cap">—</span></div>
+      <div class="row"><span class="k">Result</span><span class="v" id="dry-out">—</span></div>
+    </div>
+    <div id="progress" style="display:none; margin-top: .8rem;">
+      <div class="row"><span class="k">Progress</span><span class="v" id="prog-text">—</span></div>
+      <div class="bar"><span id="prog-bar"></span></div>
+      <div class="muted" id="prog-file" style="margin-top:.4rem; font-size:.8rem;">—</div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Activity</h2>
+    <div class="log" id="log"></div>
+  </section>
+
+  <section class="card">
+    <h2>History</h2>
+    <table><thead><tr><th>Job</th><th>State</th><th>Copied</th><th>Failed</th></tr></thead>
+    <tbody id="history"><tr><td colspan="4" class="muted">No backups yet</td></tr></tbody></table>
+  </section>
+
+  <section class="card">
+    <h2>Device</h2>
+    <div class="actions">
+      <button class="secondary" id="btn-reboot">Reboot</button>
+      <button id="btn-shutdown" style="background: var(--err)">Shut Down</button>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="modal" style="display:none">
+  <div class="modal-box">
+    <p id="modal-msg"></p>
+    <div class="modal-actions">
+      <button class="secondary" id="modal-cancel">Cancel</button>
+      <button id="modal-ok">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let lastSeq = 0;
+let currentJob = null;
+
+function confirmDialog(message, okLabel = "Confirm", danger = false) {
+  return new Promise((resolve) => {
+    $("modal-msg").textContent = message;
+    const ok = $("modal-ok");
+    ok.textContent = okLabel;
+    ok.style.background = danger ? "var(--err)" : "var(--accent)";
+    $("modal").style.display = "flex";
+    const done = (v) => { $("modal").style.display = "none"; ok.onclick = null; $("modal-cancel").onclick = null; resolve(v); };
+    ok.onclick = () => done(true);
+    $("modal-cancel").onclick = () => done(false);
+  });
+}
+
+function fmtBytes(n) {
+  if (n == null) return "—";
+  const u = ["B","KB","MB","GB","TB"]; let i = 0; let v = n;
+  while (v >= 1000 && i < u.length - 1) { v /= 1000; i++; }
+  return `${v.toFixed(i ? 1 : 0)} ${u[i]}`;
+}
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.status === 202 ? r.json() : r.json();
+}
+
+function setState(s) {
+  const el = $("state"); el.textContent = s;
+  const running = /COPYING|VERIFYING|SCANNING|HASHING|COMPARING|QUEUED|MOUNTING/.test(s);
+  el.classList.toggle("run", running);
+}
+
+async function refreshStatus() {
+  try {
+    const s = await api("/api/v1/status");
+    setState(s.state);
+    if (s.source) { $("src-name").textContent = s.source.logical_name; $("src-path").textContent = s.source.root; }
+    else { $("src-name").textContent = "No card"; $("src-path").textContent = "—"; }
+    $("btn-start").disabled = !s.source || s.backup_running;
+    $("btn-dry").disabled = !s.source || s.backup_running;
+    $("btn-start").style.display = s.backup_running ? "none" : "";
+    $("btn-cancel").style.display = s.backup_running ? "" : "none";
+  } catch (e) {}
+}
+
+async function refreshSource() {
+  try {
+    const s = await api("/api/v1/source");
+    const backed = $("src-bar-backed"), needs = $("src-bar-needs"), legend = $("src-legend");
+    if (!s.present || !s.total_bytes) {
+      $("src-cap").textContent = "—";
+      backed.style.width = needs.style.width = "0%";
+      legend.textContent = "—";
+      return;
+    }
+    $("src-cap").textContent = `${fmtBytes(s.used_bytes)} / ${fmtBytes(s.total_bytes)}`;
+    const usedPct = (s.used_bytes / s.total_bytes) * 100;
+    if (s.backed_up_bytes == null) {
+      // No scan yet: show used as a neutral bar and invite a dry run.
+      backed.style.width = "0%";
+      needs.style.width = usedPct + "%";
+      needs.style.background = "var(--muted)";
+      legend.textContent = "Run Dry Run to see what's already backed up";
+    } else {
+      const backedPct = (s.backed_up_bytes / s.total_bytes) * 100;
+      const toBackUp = Math.max(0, s.used_bytes - s.backed_up_bytes);
+      backed.style.width = backedPct + "%";
+      needs.style.width = Math.max(0, usedPct - backedPct) + "%";
+      needs.style.background = "#ef4444";
+      legend.innerHTML =
+        `<span class="swatch" style="background:var(--ok)"></span> ${fmtBytes(s.backed_up_bytes)} backed up` +
+        ` &nbsp; <span class="swatch" style="background:#ef4444"></span> ${fmtBytes(toBackUp)} to back up`;
+    }
+  } catch (e) {}
+}
+
+async function refreshDestination() {
+  try {
+    const d = await api("/api/v1/destination");
+    $("dest-path").textContent = d.backup_root;
+    if (d.present && d.total_bytes) {
+      $("dest-cap").textContent = `${fmtBytes(d.free_bytes)} free / ${fmtBytes(d.total_bytes)}`;
+      const usedPct = Math.round((d.used_bytes / d.total_bytes) * 100);
+      $("dest-bar").style.width = usedPct + "%";
+    } else {
+      $("dest-cap").textContent = "not mounted";
+      $("dest-bar").style.width = "0%";
+    }
+    $("dest-backed").textContent = `${d.verified_object_count} files · ${fmtBytes(d.backed_up_bytes)}`;
+  } catch (e) {}
+}
+
+async function refreshHistory() {
+  try {
+    const { jobs } = await api("/api/v1/backups");
+    const tb = $("history");
+    if (!jobs.length) { tb.innerHTML = '<tr><td colspan="4" class="muted">No backups yet</td></tr>'; return; }
+    tb.innerHTML = jobs.map(j => {
+      const cls = j.state === "BACKUP_COMPLETED" ? "ok" : (j.state === "BACKUP_FAILED" ? "err" : "warn");
+      return `<tr><td>${j.id}</td><td class="${cls}">${j.state.replace("BACKUP_","")}</td><td>${j.files_copied ?? 0}</td><td>${j.files_failed ?? 0}</td></tr>`;
+    }).join("");
+  } catch (e) {}
+}
+
+function logEvent(ev) {
+  const el = $("log");
+  const line = document.createElement("div");
+  line.textContent = `${ev.timestamp.slice(11,19)} ${ev.type} ${ev.message}`;
+  el.prepend(line);
+  while (el.childElementCount > 60) el.lastChild.remove();
+}
+
+function handleEvent(ev) {
+  lastSeq = Math.max(lastSeq, ev.sequence);
+  logEvent(ev);
+  if (ev.type === "SYSTEM_STATE_CHANGED" && ev.details.to) setState(ev.details.to);
+  if (ev.type === "BACKUP_STARTED") { currentJob = ev.details.job_id; refreshStatus(); }
+  if (ev.type === "BACKUP_PROGRESS") {
+    const { done, total, current_file } = ev.details;
+    $("progress").style.display = "block";
+    const pct = total ? Math.round((done / total) * 100) : 0;
+    $("prog-bar").style.width = pct + "%";
+    $("prog-text").textContent = `${done} / ${total} (${pct}%)`;
+    $("prog-file").textContent = current_file || "";
+  }
+  if (ev.type === "BACKUP_COMPLETED" || ev.type === "BACKUP_FAILED" || ev.type === "BACKUP_CANCELLED") {
+    currentJob = null;
+    refreshHistory(); refreshStatus(); refreshSource(); refreshDestination();
+    setTimeout(() => { $("progress").style.display = "none"; }, 1500);
+  }
+}
+
+function connectWS() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/api/v1/events?since=${lastSeq}`);
+  ws.onopen = () => { $("conn").style.background = "var(--ok)"; };
+  ws.onclose = () => { $("conn").style.background = "var(--err)"; setTimeout(connectWS, 1500); };
+  ws.onmessage = (m) => handleEvent(JSON.parse(m.data));
+}
+
+$("btn-dry").onclick = async () => {
+  $("btn-dry").disabled = true;
+  try {
+    const d = await api("/api/v1/dry-run", { method: "POST" });
+    $("dry").style.display = "block";
+    $("dry-new").textContent = d.new_file_count;
+    $("dry-dup").textContent = d.already_backed_up_count;
+    $("dry-bytes").textContent = fmtBytes(d.new_bytes);
+    $("dry-cap").textContent = `${fmtBytes(d.required_bytes)} / ${fmtBytes(d.available_bytes)}`;
+    const out = $("dry-out"); out.textContent = d.outcome;
+    out.className = "v " + (d.outcome === "READY" ? "ok" : d.outcome === "WARNING" ? "warn" : "err");
+  } catch (e) { alert("Dry run failed: " + e.message); }
+  refreshStatus(); refreshSource();
+};
+
+$("btn-start").onclick = async () => {
+  $("btn-start").disabled = true;
+  try { await api("/api/v1/backups", { method: "POST" }); }
+  catch (e) { alert("Could not start: " + e.message); }
+  refreshStatus();
+};
+
+$("btn-cancel").onclick = async () => {
+  if (!currentJob) return;
+  if (!await confirmDialog("Cancel the running backup? Files already verified are kept safe.", "Cancel Backup", true)) return;
+  $("btn-cancel").disabled = true;
+  try { await api(`/api/v1/backups/${currentJob}/cancel`, { method: "POST" }); }
+  catch (e) { alert("Could not cancel: " + e.message); }
+  $("btn-cancel").disabled = false;
+};
+
+async function systemAction(path, message, okLabel) {
+  if (!await confirmDialog(message, okLabel, true)) return;
+  try {
+    await api(path, { method: "POST" });
+    alert(okLabel + " requested.");
+  } catch (e) {
+    alert(`Could not ${okLabel.toLowerCase()} (HTTP ${e.message}). On the appliance this ` +
+          `controls the device; it is not available in the macOS dev server.`);
+  }
+}
+
+$("btn-reboot").onclick = () =>
+  systemAction("/api/v1/system/reboot", "Reboot the device now?", "Reboot");
+$("btn-shutdown").onclick = () =>
+  systemAction("/api/v1/system/shutdown", "Shut down the device now?", "Shut Down");
+
+refreshStatus();
+refreshSource();
+refreshDestination();
+refreshHistory();
+connectWS();
+setInterval(() => { refreshStatus(); refreshSource(); refreshDestination(); }, 5000);
+</script>
+</body>
+</html>

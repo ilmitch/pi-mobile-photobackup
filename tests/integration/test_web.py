@@ -175,6 +175,26 @@ def test_system_includes_watch_telemetry(tmp_path: Path) -> None:
         assert {"THERMAL", "POWER", "STORAGE"} <= kinds
 
 
+def test_time_sync_marks_clock_trusted(tmp_path: Path) -> None:
+    watch = WatchService(
+        thermal_warning_celsius=75, storage_critical_bytes=1,
+        telemetry_reader=lambda _p: Telemetry(None, None, 1.0, 1.0, 1, 1),
+    )
+    app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}), watch=watch)
+    with TestClient(app) as client:
+        assert client.get("/api/v1/system").json()["clock_state"] == "CLOCK_UNTRUSTED"
+        resp = client.post("/api/v1/time/sync")
+        assert resp.status_code == 202
+        assert resp.json()["clock_state"] == "CLOCK_PHONE_SYNCED"
+        assert client.get("/api/v1/system").json()["clock_state"] == "CLOCK_PHONE_SYNCED"
+
+
+def test_time_sync_409_without_watch(tmp_path: Path) -> None:
+    app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}))
+    with TestClient(app) as client:
+        assert client.post("/api/v1/time/sync").status_code == 409
+
+
 def test_system_without_watch_omits_health_fields(tmp_path: Path) -> None:
     app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}))
     with TestClient(app) as client:

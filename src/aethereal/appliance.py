@@ -43,6 +43,11 @@ def build_appliance(
     repo = ManifestRepository(conn)
     appliance_conn = open_appliance_db(config.database.appliance_path)
 
+    watch = WatchService(
+        thermal_warning_celsius=config.thermal.warning_celsius,
+        storage_critical_bytes=config.system_storage.critical_free_bytes,
+    )
+
     engine = BackupEngine(
         repo=repo,
         object_store_root=config.destination.object_store_root,
@@ -53,6 +58,10 @@ def build_appliance(
         safety_margin_min_bytes=config.destination.safety_margin_min_bytes,
         retries=config.backup.verification_retries,
         chunk_bytes=config.backup.io_chunk_bytes,
+        # TIME-001: block dated sessions until the clock is trusted (RTC/phone/network).
+        is_clock_trusted=(lambda: watch.clock.is_trusted)
+        if config.time.require_trusted_clock
+        else None,
     )
     # Reconcile any job interrupted before this start (REC-001).
     engine.recover_on_startup()
@@ -69,11 +78,6 @@ def build_appliance(
         **manager_kwargs,  # type: ignore[arg-type]
     )
 
-    watch = WatchService(
-        thermal_warning_celsius=config.thermal.warning_celsius,
-        storage_critical_bytes=config.system_storage.critical_free_bytes,
-    )
-
     app = create_app(
         engine=engine,
         repo=repo,
@@ -87,5 +91,6 @@ def build_appliance(
     app.state.engine = engine
     app.state.repo = repo
     app.state.media_manager = manager
+    app.state.watch = watch
     app.state.appliance_db = appliance_conn
     return app

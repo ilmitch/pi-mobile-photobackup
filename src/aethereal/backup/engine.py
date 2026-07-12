@@ -99,6 +99,7 @@ class BackupEngine:
         reserve_floor_bytes: int = DEFAULT_RESERVE_FLOOR_BYTES,
         retries: int = 2,
         chunk_bytes: int = DEFAULT_CHUNK_BYTES,
+        is_clock_trusted: Callable[[], bool] | None = None,
     ) -> None:
         self._repo = repo
         self._object_store_root = Path(object_store_root)
@@ -111,6 +112,8 @@ class BackupEngine:
         self._reserve_floor_bytes = reserve_floor_bytes
         self._retries = retries
         self._chunk_bytes = chunk_bytes
+        # TIME-001: a dated backup session may only be created when the clock is trusted.
+        self._is_clock_trusted = is_clock_trusted or (lambda: True)
         self._sm = JobStateMachine(on_transition=self._on_transition)
         self._cancel_token: CancellationToken | None = None
         # Cache of the most recent scan: (source_root, bytes_already_backed_up). Used by
@@ -264,14 +267,23 @@ class BackupEngine:
         self._sm.transition(BackupState.PREFLIGHT_CAPACITY_CHECK)
         preflight = self._run_preflight(source_root, session_root)
         self._last_scan = (str(source_root), preflight.already_backed_up_bytes)
+        clock_trusted = self._is_clock_trusted()
 
-        if preflight.outcome is PreflightOutcome.BLOCKED:
+        if preflight.outcome is PreflightOutcome.BLOCKED or not clock_trusted:
             self._sm.transition(BackupState.PREFLIGHT_BLOCKED)
+            reasons = list(preflight.block_reasons)
+            if not clock_trusted:
+                reasons.append(
+                    "wall-clock time is untrusted; a dated backup session cannot be "
+                    "created (TIME-001)"
+                )
             self._emit(
                 EventType.PREFLIGHT_COMPLETED, EventSeverity.WARNING, "preflight blocked",
-                reasons=list(preflight.block_reasons),
+                reasons=reasons,
             )
-            return EngineResult(self._sm.state, preflight.outcome, preflight, None, None)
+            return EngineResult(
+                self._sm.state, PreflightOutcome.BLOCKED, preflight, None, None
+            )
 
         if preflight.outcome is PreflightOutcome.WARNING:
             self._sm.transition(BackupState.PREFLIGHT_WARNING)

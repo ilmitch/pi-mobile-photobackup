@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -22,7 +23,13 @@ BIG = FakePlatformOps(total_bytes=1_000_000_000_000, free_bytes=1_000_000_000_00
 FIXED_CLOCK = lambda: datetime(2026, 7, 11, 12, 0, 0, tzinfo=timezone.utc)  # noqa: E731
 
 
-def _engine(tmp_path: Path, *, platform: FakePlatformOps = BIG, bus: EventBus | None = None) -> tuple[BackupEngine, ManifestRepository]:
+def _engine(
+    tmp_path: Path,
+    *,
+    platform: FakePlatformOps = BIG,
+    bus: EventBus | None = None,
+    is_clock_trusted: Callable[[], bool] | None = None,
+) -> tuple[BackupEngine, ManifestRepository]:
     conn = open_destination_manifest(tmp_path / "Backups" / "manifest.sqlite3")
     repo = ManifestRepository(conn)
     engine = BackupEngine(
@@ -32,6 +39,7 @@ def _engine(tmp_path: Path, *, platform: FakePlatformOps = BIG, bus: EventBus | 
         platform=platform,
         event_bus=bus,
         clock=FIXED_CLOCK,
+        is_clock_trusted=is_clock_trusted,
     )
     return engine, repo
 
@@ -186,6 +194,27 @@ def test_reinserting_same_card_dedups_without_recopy(tmp_path: Path) -> None:
     session2 = Path(_session_path(repo, r2.job_id))
     assert (session2 / "DCIM/A.CR3").exists()
     assert (session2 / "DCIM/B.CR3").exists()
+
+
+def test_untrusted_clock_blocks_backup(tmp_path: Path) -> None:
+    # TIME-001: with an untrusted clock, the backup is blocked (no dated session created).
+    bus = EventBus()
+    received: list[Event] = []
+    bus.subscribe(received.append)
+    engine, repo = _engine(tmp_path, bus=bus, is_clock_trusted=lambda: False)
+
+    result = engine.run_backup(_source(tmp_path, {"a.cr3": b"a"}), "CARD")
+
+    assert result.preflight_outcome is PreflightOutcome.BLOCKED
+    assert result.job is None
+    assert engine.state is BackupState.PREFLIGHT_BLOCKED
+    assert repo.list_backup_jobs() == []  # no dated session/job created
+    reasons = [
+        str(e.details.get("reasons"))
+        for e in received
+        if e.type is EventType.PREFLIGHT_COMPLETED
+    ]
+    assert any("untrusted" in r for r in reasons)
 
 
 def test_request_cancellation_is_false_when_idle(tmp_path: Path) -> None:

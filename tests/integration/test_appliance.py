@@ -97,6 +97,11 @@ def test_appliance_backs_up_an_inserted_card(tmp_path: Path) -> None:
         assert dry["outcome"] == "READY"
         assert dry["new_file_count"] == 2
 
+        # TIME-001: the appliance clock starts untrusted; establish trust (phone sync)
+        # before a dated backup session can be created.
+        assert client.get("/api/v1/system").json()["clock_state"] == "CLOCK_UNTRUSTED"
+        assert client.post("/api/v1/time/sync").status_code == 202
+
         assert client.post("/api/v1/backups").status_code == 202
         deadline_jobs = None
         import time

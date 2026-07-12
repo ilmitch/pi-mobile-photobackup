@@ -76,6 +76,7 @@
     <div class="row"><span class="k">Used / Total</span><span class="v" id="src-cap">—</span></div>
     <div class="bar"><span id="src-bar-backed"></span><span id="src-bar-needs"></span></div>
     <div class="muted" id="src-legend" style="font-size:.78rem; margin-top:.45rem;">—</div>
+    <div id="source-picker"></div>
   </section>
 
   <section class="card" id="dest-card">
@@ -125,6 +126,7 @@
     <div class="row"><span class="k">Clock</span><span class="v" id="sys-clock">—</span></div>
     <div class="row"><span class="k">Power</span><span class="v" id="sys-power">—</span></div>
     <div id="sys-warnings" style="margin-top:.5rem; font-size:.82rem;"></div>
+    <button id="btn-sync-time" class="secondary" style="display:none; margin-top:.6rem; width:100%">Set time from this device</button>
   </section>
 
   <section class="card">
@@ -249,6 +251,7 @@ async function refreshSystem() {
     $("sys-temp").textContent = s.cpu_temperature_celsius != null ? `${s.cpu_temperature_celsius.toFixed(1)} °C` : "n/a";
     $("sys-storage").textContent = s.storage_free_bytes != null ? `${fmtBytes(s.storage_free_bytes)} free` : "—";
     $("sys-clock").textContent = s.clock_state ? s.clock_state.replace("CLOCK_", "").replace("_", " ").toLowerCase() : "—";
+    $("btn-sync-time").style.display = s.clock_state === "CLOCK_UNTRUSTED" ? "" : "none";
     const power = $("sys-power");
     if (s.undervoltage == null) { power.textContent = "—"; power.className = "v muted"; }
     else if (s.undervoltage) { power.textContent = "undervoltage"; power.className = "v err"; }
@@ -258,6 +261,34 @@ async function refreshSystem() {
       ? warnings.map(w => `<div class="err">⚠ ${w.message}</div>`).join("")
       : "";
   } catch (e) {}
+}
+
+async function refreshMedia() {
+  try {
+    const m = await api("/api/v1/media");
+    const picker = $("source-picker");
+    if (m.managed && m.state === "MULTIPLE_SOURCES") {
+      picker.innerHTML = '<div class="muted" style="margin:.6rem 0 .2rem">Multiple cards — choose one:</div>' +
+        m.candidates.map(c =>
+          `<button class="secondary" style="width:100%;margin-top:.35rem" data-uuid="${c.uuid}">` +
+          `${c.label || c.name} · ${fmtBytes(c.size_bytes)}</button>`
+        ).join("");
+      picker.querySelectorAll("button").forEach(b =>
+        b.addEventListener("click", () => selectCard(b.dataset.uuid)));
+    } else {
+      picker.innerHTML = "";
+    }
+  } catch (e) {}
+}
+
+async function selectCard(uuid) {
+  try {
+    await api("/api/v1/media/select", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uuid }),
+    });
+  } catch (e) { alert("Could not select card: " + e.message); }
+  refreshSource(); refreshMedia();
 }
 
 async function refreshHistory() {
@@ -355,13 +386,22 @@ $("btn-reboot").onclick = () =>
 $("btn-shutdown").onclick = () =>
   systemAction("/api/v1/system/shutdown", "Shut down the device now?", "Shut Down");
 
+$("btn-sync-time").onclick = async () => {
+  try { await api("/api/v1/time/sync", { method: "POST" }); }
+  catch (e) { alert("Could not set time: " + e.message); }
+  refreshSystem();
+};
+
 refreshStatus();
 refreshSource();
+refreshMedia();
 refreshDestination();
 refreshSystem();
 refreshHistory();
 connectWS();
-setInterval(() => { refreshStatus(); refreshSource(); refreshDestination(); refreshSystem(); }, 5000);
+setInterval(() => {
+  refreshStatus(); refreshSource(); refreshMedia(); refreshDestination(); refreshSystem();
+}, 5000);
 </script>
 </body>
 </html>

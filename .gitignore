@@ -23,3 +23,6 @@ config/local.yaml
 
 # OS
 .DS_Store
+
+# Claude Code local tooling state (session-specific permission allowlist etc.)
+.claude/

@@ -78,6 +78,18 @@ class BackupService:
         self._executor.shutdown(wait=False, cancel_futures=True)
 
 
+def _metric(read: Callable[[], float]) -> float | None:
+    """Read a host telemetry value, or None if the host does not permit it (WEB-008).
+
+    Host metrics are best-effort: on restricted hosts (sandboxes, some containers)
+    ``psutil`` can raise, and a missing metric must never fail the status endpoint.
+    """
+    try:
+        return read()
+    except Exception:
+        return None
+
+
 def _event_json(event: Event) -> dict[str, object]:
     return {
         "sequence": event.sequence,
@@ -170,11 +182,11 @@ def create_app(
 
     @app.get("/api/v1/system")
     async def system() -> dict[str, object]:
-        memory = psutil.virtual_memory()
+        boot = _metric(psutil.boot_time)
         return {
-            "uptime_seconds": time.time() - psutil.boot_time(),
-            "cpu_percent": psutil.cpu_percent(interval=None),
-            "memory_percent": memory.percent,
+            "uptime_seconds": (time.time() - boot) if boot is not None else None,
+            "cpu_percent": _metric(lambda: psutil.cpu_percent(interval=None)),
+            "memory_percent": _metric(lambda: psutil.virtual_memory().percent),
             "engine_state": engine.state.value,
             "backup_running": service.is_running(),
         }

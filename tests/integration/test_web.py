@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -113,6 +114,27 @@ def test_status_and_system(tmp_path: Path) -> None:
         system = client.get("/api/v1/system").json()
         assert "uptime_seconds" in system
         assert system["engine_state"] == "IDLE"
+
+
+def test_system_endpoint_survives_blocked_telemetry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Reproduce a restricted host (e.g. sandbox) where psutil calls are denied.
+    def denied(*_args: object, **_kwargs: object) -> float:
+        raise PermissionError("telemetry not permitted")
+
+    monkeypatch.setattr("aethereal.web.app.psutil.boot_time", denied)
+    monkeypatch.setattr("aethereal.web.app.psutil.cpu_percent", denied)
+    monkeypatch.setattr("aethereal.web.app.psutil.virtual_memory", denied)
+
+    app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}))
+    with TestClient(app) as client:
+        resp = client.get("/api/v1/system")
+        assert resp.status_code == 200  # never 500 on blocked telemetry
+        body = resp.json()
+        assert body["uptime_seconds"] is None
+        assert body["cpu_percent"] is None
+        assert body["engine_state"] == "IDLE"
 
 
 def test_source_endpoint(tmp_path: Path) -> None:

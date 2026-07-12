@@ -30,6 +30,7 @@ from aethereal.backup.state_machine import BackupState
 from aethereal.common.events import Event, EventBus
 from aethereal.common.source import SourceRef
 from aethereal.db.manifest_repo import ManifestRepository
+from aethereal.led.controller import led_state_for
 from aethereal.linux.media import MediaManager
 from aethereal.watch.service import WatchService
 
@@ -141,6 +142,7 @@ def create_app(
     async def status() -> dict[str, object]:
         return {
             "state": engine.state.value,
+            "led_state": led_state_for(engine.state).value,
             "backup_running": service.is_running(),
             "last_event_sequence": event_bus.last_sequence if event_bus else 0,
             "source": _source_payload(),

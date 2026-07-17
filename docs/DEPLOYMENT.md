@@ -38,22 +38,130 @@ curl -LsSf https://astral.sh/uv/install.sh | sh   # installs uv to ~/.local/bin 
 
 ## 3. Prepare the destination SSD (ext4)
 
-The v1 correctness profile **requires ext4** on the destination (hardlink + durability
-semantics). If your SSD has a Time Machine partition, keep it (APFS) and format a
-**separate** partition for Aethereal as ext4.
+The v1 correctness profile **requires ext4** on the destination, and the app enforces it:
+`validate_destination` rejects any non-ext4 filesystem, so a backup will refuse to run on
+exFAT/APFS/NTFS. This is not a preference — session snapshots use **hardlinks**, which
+exFAT/FAT/APFS-over-FUSE do not support, and the durability path relies on ext4
+finalization semantics.
 
-```sh
-lsblk -o NAME,PATH,FSTYPE,SIZE,MOUNTPOINT      # identify your SSD partition, e.g. /dev/sda1
-sudo mkfs.ext4 -L AETHEREAL /dev/sdaX          # format the archive partition ext4
-sudo mkdir -p /mnt/backup
-sudo mount /dev/sdaX /mnt/backup               # mount it
-blkid -s UUID -o value /dev/sdaX               # <-- copy this UUID into the config below
+> **Trade-off:** ext4 is not natively readable on macOS or Windows. The backup drive is
+> meant to live on the Pi. If you occasionally need it on a Mac, use a third-party driver
+> (e.g. Paragon extFS) or read it over the network from the Pi — do **not** reformat to a
+> Mac-friendly filesystem, as that breaks the appliance.
+
+### 3a. USB-SATA bridge check first (UAS quirk)
+
+The heaviest sustained writes in the whole setup are `mkfs.ext4` journal creation and the
+first real backup — and that is exactly when a flaky USB-SATA bridge falls over. Many
+common enclosures (notably **JMicron JMS578**, `152d:0578`, and some ASMedia/Realtek
+chips) mishandle **UAS** (USB Attached SCSI) under load: the kernel's `uas` driver keeps
+resetting the device until the whole xHCI host controller dies, taking the drive offline
+mid-write. In `dmesg` this looks like:
+
+```text
+uas_eh_abort_handler ... uas_eh_device_reset_handler
+xhci_hcd ...: xHCI host controller not responding, assume dead
+usb 2-1: USB disconnect
 ```
 
-To auto-mount at boot, add it to `/etc/fstab` by UUID:
+This is **not** a power problem (a healthy `vcgencmd get_throttled` of `0x0` does not rule
+it out) and **not** a bad `mkfs` — the drive genuinely vanishes. The fix is to disable UAS
+for that bridge and fall back to the plain `usb-storage` driver.
+
+1. Find the bridge's USB `VID:PID`:
+
+   ```sh
+   lsusb        # e.g. "ID 152d:0578 JMicron ... JMS578 SATA 6Gb/s"
+   ```
+
+2. Append `usb-storage.quirks=<VID>:<PID>:u` to the **single line** in
+   `/boot/firmware/cmdline.txt` (the `:u` flag forces usb-storage instead of UAS). Back it
+   up first, and keep it one line:
+
+   ```sh
+   sudo cp /boot/firmware/cmdline.txt /boot/firmware/cmdline.txt.bak
+   sudo sed -i 's/$/ usb-storage.quirks=152d:0578:u/' /boot/firmware/cmdline.txt   # use YOUR VID:PID
+   cat /boot/firmware/cmdline.txt        # verify: quirk appears once, still one line
+   ```
+
+3. Reboot, then confirm UAS is now disabled for the device:
+
+   ```sh
+   sudo reboot
+   # after reboot:
+   lsusb -t                                  # the bridge should show Driver=usb-storage, not uas
+   dmesg | grep -iE "usb-storage|uas"        # expect "UAS is ignored ... using usb-storage instead"
+   ```
+
+If after "HC died" the drive is missing from `lsblk`/`lsusb`, a warm reboot may not clear
+it — do a full **cold** power cycle (shut down, unplug Pi power *and* the SSD, wait ~30 s,
+reconnect, boot).
+
+> **Secondary — power (bus-powered SSDs).** Independently, a bus-powered SSD can brown out
+> under sustained writes. If `vcgencmd get_throttled` is non-zero (not `0x0`), you have an
+> under-voltage problem too: use the official Pi PSU, a **powered** USB hub, or a better
+> cable/enclosure before formatting.
+
+### 3b. Format
+
+Identify the SSD, then choose one of the two layouts below. Replace `sdX`/`sdXN` with the
+**actual** device from `lsblk` (e.g. `sda` / `sda1`) — these are placeholders, not literal
+names.
+
+```sh
+lsblk -o NAME,PATH,FSTYPE,SIZE,MOUNTPOINT      # identify your SSD, e.g. /dev/sda
+```
+
+**Option A — dedicate the whole disk (recommended for a Pi-only backup drive).** Wipes
+everything on the SSD and creates a single ext4 partition:
+
+```sh
+sudo umount /dev/sdX* 2>/dev/null              # unmount any existing partitions
+sudo wipefs -a /dev/sdX                        # clear old partition signatures
+sudo parted /dev/sdX --script mklabel gpt
+sudo parted /dev/sdX --script mkpart AETHEREAL 0% 100%
+sudo partprobe /dev/sdX
+sudo mkfs.ext4 -L AETHEREAL /dev/sdX1          # single partition spanning the disk
+```
+
+**Option B — keep an existing partition (e.g. a Time Machine/APFS volume).** Format only
+the **separate** partition you've allocated for Aethereal:
+
+```sh
+sudo mkfs.ext4 -L AETHEREAL /dev/sdXN          # the Aethereal partition only
+```
+
+Then mount and capture the UUID (both options):
+
+```sh
+sudo mkdir -p /mnt/backup
+sudo mount /dev/sdX1 /mnt/backup               # sdX1 (A) or sdXN (B)
+sudo blkid -s UUID -o value /dev/sdX1          # <-- copy this UUID into the config below
+```
+
+> Let `mkfs.ext4` run to completion (`Writing superblocks ... done`) — do **not** interrupt
+> it. An uninterrupted format also confirms the drive survives a full sustained write.
+
+### 3c. Auto-mount at boot
+
+Add it to `/etc/fstab` by UUID (grabs the UUID inline so you don't copy/paste it):
+
+```sh
+echo "UUID=$(sudo blkid -s UUID -o value /dev/sdX1)  /mnt/backup  ext4  defaults,noatime  0  2" | sudo tee -a /etc/fstab
+```
+
+The line should read:
 
 ```
 UUID=<archive-uuid>  /mnt/backup  ext4  defaults,noatime  0  2
+```
+
+Verify it mounts cleanly **before** rebooting — a bad fstab entry can block boot:
+
+```sh
+sudo umount /mnt/backup
+sudo mount -a
+findmnt /mnt/backup        # should show /dev/sdX1, type ext4
 ```
 
 ## 4. Install the application

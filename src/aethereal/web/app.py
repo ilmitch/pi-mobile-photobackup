@@ -184,6 +184,7 @@ def create_app(
         return {
             "managed": True,
             "state": media_manager.state().value,
+            "safe_to_remove": media_manager.awaiting_removal(),
             "candidates": [
                 {
                     "uuid": c.uuid,
@@ -204,6 +205,16 @@ def create_app(
             raise HTTPException(status_code=409, detail="media selection not available")
         media_manager.select(body.uuid)
         return {"selected": body.uuid}
+
+    @app.post("/api/v1/media/eject", status_code=202)
+    async def media_eject(_auth: None = Depends(require_auth)) -> dict[str, object]:
+        """Safely unmount the source card so it can be physically removed (SRC-008)."""
+        if media_manager is None:
+            raise HTTPException(status_code=503, detail="media manager unavailable")
+        if service.is_running():
+            raise HTTPException(status_code=409, detail="a backup is running")
+        ejected = await asyncio.to_thread(media_manager.eject)
+        return {"ejected": ejected}
 
     @app.get("/api/v1/destination")
     async def destination() -> dict[str, object]:

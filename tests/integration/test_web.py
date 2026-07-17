@@ -410,6 +410,33 @@ def test_media_wiring_detect_select_remove(tmp_path: Path) -> None:
         assert client.get("/api/v1/source").json() == {"present": False}
 
 
+def test_media_eject_makes_card_safe_to_remove(tmp_path: Path) -> None:
+    devices: list[BlockDevice] = [_DEST_DEV, _card("sda1", "card-uuid", "CANON_R6")]
+    manager = MediaManager(
+        destination_uuid=_DEST_UUID,
+        source_mount_root=tmp_path / "src",
+        device_lister=lambda: list(devices),
+        mount_service=_FakeMountService(),
+    )
+    app = _build(tmp_path, source=None, media_manager=manager)
+    with TestClient(app) as client:
+        assert client.get("/api/v1/media").json()["state"] == "SINGLE_SOURCE"
+
+        # Eject: the card is no longer an active source and is flagged safe to remove,
+        # and it does NOT re-appear on subsequent polls while still inserted.
+        assert client.post("/api/v1/media/eject").json() == {"ejected": 1}
+        media = client.get("/api/v1/media").json()
+        assert media["state"] == "NO_SOURCE"
+        assert media["safe_to_remove"] is True
+        assert client.get("/api/v1/source").json() == {"present": False}
+
+        # Physically pull it: the safe-to-remove flag clears.
+        devices[:] = [_DEST_DEV]
+        media = client.get("/api/v1/media").json()
+        assert media["state"] == "NO_SOURCE"
+        assert media["safe_to_remove"] is False
+
+
 def test_media_endpoint_unmanaged_without_manager(tmp_path: Path) -> None:
     app = _build(tmp_path, source=_source(tmp_path, {"a.cr3": b"a"}))
     with TestClient(app) as client:

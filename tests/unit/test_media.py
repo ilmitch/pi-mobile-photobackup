@@ -144,3 +144,40 @@ def test_eject_all_unmounts_everything() -> None:
     mgr.current_source()
     mgr.eject_all()
     assert str(Path(MOUNT_ROOT) / "card-uuid") in mounts.unmounted
+
+
+def test_eject_suppresses_remount_until_physically_removed() -> None:
+    mounts = FakeMountService()
+    devices = [_DEST, _dev("sda1", "card-uuid", label="CANON")]
+    mgr = _manager(devices, mounts)
+
+    # Mounted and in use.
+    assert mgr.current_source() is not None
+    assert mounts.mount_calls == 1
+
+    # Eject: unmounted, and while still physically present it is "safe to remove".
+    assert mgr.eject() == 1
+    assert str(Path(MOUNT_ROOT) / "card-uuid") in mounts.unmounted
+    assert mgr.awaiting_removal() is True
+    assert mgr.state() is MediaState.NO_SOURCE
+
+    # Crucially, polling does NOT re-mount the ejected card (the whole point of eject).
+    assert mgr.current_source() is None
+    assert mgr.source_candidates() == []
+    assert mounts.mount_calls == 1  # still 1 — no re-mount
+
+    # Physically remove the card: ejection mark clears.
+    devices[:] = [_DEST]
+    assert mgr.awaiting_removal() is False
+
+    # Re-insert the same card: detected and mountable again as normal.
+    devices[:] = [_DEST, _dev("sda1", "card-uuid", label="CANON")]
+    assert mgr.state() is MediaState.SINGLE_SOURCE
+    assert mgr.current_source() is not None
+    assert mounts.mount_calls == 2
+
+
+def test_eject_with_no_card_is_noop() -> None:
+    mgr = _manager([_DEST], FakeMountService())
+    assert mgr.eject() == 0
+    assert mgr.awaiting_removal() is False

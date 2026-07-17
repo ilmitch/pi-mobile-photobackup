@@ -77,6 +77,10 @@
     <div class="bar"><span id="src-bar-backed"></span><span id="src-bar-needs"></span></div>
     <div class="muted" id="src-legend" style="font-size:.78rem; margin-top:.45rem;">—</div>
     <div id="source-picker"></div>
+    <div id="src-eject-wrap" style="display:none; margin-top:.6rem;">
+      <button class="secondary" id="btn-eject" style="width:100%">Eject SD card</button>
+    </div>
+    <div id="src-safe" class="ok" style="display:none; margin-top:.55rem; font-size:.85rem;">✓ Safe to remove — you can pull the card now.</div>
   </section>
 
   <section class="card" id="dest-card">
@@ -279,7 +283,20 @@ async function refreshMedia() {
     } else {
       picker.innerHTML = "";
     }
+    // Eject control: offered whenever a card is mounted; hidden once ejected/absent.
+    const hasCard = m.managed && (m.state === "SINGLE_SOURCE" || m.state === "MULTIPLE_SOURCES");
+    $("src-eject-wrap").style.display = hasCard ? "block" : "none";
+    $("src-safe").style.display = m.safe_to_remove ? "block" : "none";
   } catch (e) {}
+}
+
+async function ejectCard() {
+  const btn = $("btn-eject");
+  btn.disabled = true;
+  try { await api("/api/v1/media/eject", { method: "POST" }); }
+  catch (e) { alert("Could not eject: " + e.message); }
+  btn.disabled = false;
+  refreshStatus(); refreshSource(); refreshMedia();
 }
 
 async function selectCard(uuid) {
@@ -377,6 +394,8 @@ $("btn-start").onclick = async () => {
   catch (e) { alert("Could not start: " + e.message); }
   refreshStatus();
 };
+
+$("btn-eject").onclick = ejectCard;
 
 $("btn-cancel").onclick = async () => {
   if (!currentJob) return;

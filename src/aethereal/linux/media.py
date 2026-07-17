@@ -87,14 +87,51 @@ class MediaManager:
         self._name = name_resolver
         self._mounted: dict[str, SourceMount] = {}
         self._selected_uuid: str | None = None
+        # Device keys the user has ejected: suppressed from detection/mounting until the card
+        # is physically removed, so "safe to remove" holds instead of an instant re-mount.
+        self._ejected: set[str] = set()
 
-    def source_candidates(self) -> list[BlockDevice]:
-        """Candidate source cards currently present (vfat/exfat, not the destination)."""
+    def _raw_candidates(self) -> list[BlockDevice]:
         return find_source_candidates(
             self._list(),
             destination_uuid=self._destination_uuid,
             supported_filesystems=self._supported,
         )
+
+    def source_candidates(self) -> list[BlockDevice]:
+        """Candidate source cards currently present (vfat/exfat, not the destination).
+
+        Ejected cards are hidden until they physically disappear; a card that has since been
+        removed clears its ejection mark, so re-inserting it is detected normally.
+        """
+        raw = self._raw_candidates()
+        present_keys = {_device_key(d) for d in raw}
+        self._ejected &= present_keys  # forget cards that have physically gone
+        return [d for d in raw if _device_key(d) not in self._ejected]
+
+    def eject(self) -> int:
+        """Unmount present source card(s) and suppress re-mount until physically removed.
+
+        Returns the number of cards newly ejected. Safe to call with no card present.
+        """
+        newly = 0
+        for device in self._raw_candidates():
+            key = _device_key(device)
+            if key not in self._ejected:
+                self._ejected.add(key)
+                newly += 1
+        self.eject_all()
+        return newly
+
+    def awaiting_removal(self) -> bool:
+        """True when an ejected card is still physically present (safe to pull now).
+
+        Also clears marks for cards that have gone, so this is safe to poll independently of
+        :meth:`source_candidates` (a removed-then-reinserted card is detected afresh).
+        """
+        present_keys = {_device_key(d) for d in self._raw_candidates()}
+        self._ejected &= present_keys
+        return bool(self._ejected)
 
     def state(self) -> MediaState:
         count = len(self.source_candidates())

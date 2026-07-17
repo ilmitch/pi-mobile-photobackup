@@ -71,23 +71,30 @@ class PreflightResult:
     already_backed_up_bytes: int
     warnings: tuple[str, ...] = field(default_factory=tuple)
     block_reasons: tuple[str, ...] = field(default_factory=tuple)
+    # FILE-008 skip telemetry: non-media files excluded by the whitelist, and the distinct
+    # extensions among them (sorted), so an unlisted format is visible rather than silent.
+    skipped_non_media_count: int = 0
+    skipped_extensions: tuple[str, ...] = field(default_factory=tuple)
+    # Hidden/system files skipped (macOS ._*/.DS_Store, dot-directory contents).
+    skipped_hidden_count: int = 0
 
 
-def _is_media(name: str, media_extensions: frozenset[str]) -> bool:
-    """True if ``name`` is a media file selected by the extension whitelist.
+@dataclass(frozen=True, slots=True)
+class ScanResult:
+    """Output of a source scan: classification inputs, snapshot records, and skip telemetry."""
 
-    Dotfiles are always rejected: this drops macOS AppleDouble sidecars (``._MVI_1234.MOV``,
-    which otherwise share the real file's extension), ``.DS_Store``, and the like. The
-    extension is matched case-insensitively, without its leading dot.
-    """
-    if name.startswith("."):
-        return False
-    return Path(name).suffix.lower().lstrip(".") in media_extensions
+    inputs: list[ClassificationInput]
+    records: list[SourceFileRecord]
+    # Non-media files skipped by the whitelist, keyed by lowercase extension ("" = no
+    # extension). Excludes hidden/system junk (dotfiles), which is never a lost-media risk.
+    skipped_ext_counts: dict[str, int]
+    # Hidden/system files skipped (macOS ._* AppleDouble, .DS_Store, dot-directory contents).
+    skipped_hidden_count: int
 
 
 def _scan_source(
     source_root: Path, *, chunk_bytes: int, media_extensions: frozenset[str] = frozenset()
-) -> tuple[list[ClassificationInput], list[SourceFileRecord]]:
+) -> ScanResult:
     """Walk ``source_root`` read-only, hashing regular files and marking others.
 
     Symlinks and special objects become UNSUPPORTED inputs; files that cannot be read
@@ -96,21 +103,38 @@ def _scan_source(
     When ``media_extensions`` is non-empty, only image/video files with those extensions are
     considered (FILE-008): every other file — and every dot-directory such as
     ``.Spotlight-V100``/``.Trashes`` — is skipped entirely, so non-media never gets counted,
-    hashed, copied, or able to block a backup. An empty set keeps the faithful full-card
-    behaviour (copy every regular file).
+    hashed, copied, or able to block a backup. Skipped files are tallied so a whitelist can
+    never *silently* drop an unlisted format: a real extension like ``crm`` shows up in
+    ``skipped_ext_counts`` for the UI, while hidden junk is counted apart. An empty set keeps
+    the faithful full-card behaviour (copy every regular file).
     """
     inputs: list[ClassificationInput] = []
     records: list[SourceFileRecord] = []
+    skipped_ext_counts: dict[str, int] = {}
+    skipped_hidden = 0
     filtering = bool(media_extensions)
 
     for dirpath, dirnames, filenames in os.walk(source_root, followlinks=False):
         if filtering:
             # Prune hidden directories in place so os.walk never descends into system junk
-            # (.Spotlight-V100, .Trashes, .fseventsd, ...).
-            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+            # (.Spotlight-V100, .Trashes, .fseventsd, ...); count what we drop.
+            kept_dirs = []
+            for d in dirnames:
+                if d.startswith("."):
+                    skipped_hidden += sum(1 for _ in (Path(dirpath) / d).rglob("*"))
+                else:
+                    kept_dirs.append(d)
+            dirnames[:] = kept_dirs
         for name in filenames:
-            if filtering and not _is_media(name, media_extensions):
-                continue
+            if filtering:
+                if name.startswith("."):
+                    # macOS AppleDouble (._*.MOV shares the real extension), .DS_Store, etc.
+                    skipped_hidden += 1
+                    continue
+                ext = Path(name).suffix.lower().lstrip(".")
+                if ext not in media_extensions:
+                    skipped_ext_counts[ext] = skipped_ext_counts.get(ext, 0) + 1
+                    continue
             full = Path(dirpath) / name
             relative = normalize_relative_path(full.relative_to(source_root).as_posix())
             if full.is_symlink() or not full.is_file():
@@ -129,7 +153,7 @@ def _scan_source(
                     sha256=identity.sha256,
                 )
             )
-    return inputs, records
+    return ScanResult(inputs, records, skipped_ext_counts, skipped_hidden)
 
 
 def _to_classified(
@@ -172,9 +196,10 @@ def run_preflight(
     if not source_root.is_dir():
         raise ValueError(f"source_root is not a directory: {source_root}")
 
-    inputs, records = _scan_source(
+    scan = _scan_source(
         source_root, chunk_bytes=chunk_bytes, media_extensions=media_extensions
     )
+    inputs, records = scan.inputs, scan.records
     snapshot = build_source_snapshot(records)
 
     classification_of = {
@@ -237,4 +262,7 @@ def run_preflight(
         already_backed_up_bytes=already_backed_up_bytes,
         warnings=tuple(warnings),
         block_reasons=tuple(block_reasons),
+        skipped_non_media_count=sum(scan.skipped_ext_counts.values()),
+        skipped_extensions=tuple(sorted(scan.skipped_ext_counts)),
+        skipped_hidden_count=scan.skipped_hidden_count,
     )

@@ -178,6 +178,25 @@ def test_media_filter_keeps_only_images_and_video(tmp_path: Path) -> None:
     assert result.unreadable_count == 0
     assert result.snapshot.file_count == 3
     assert result.outcome is PreflightOutcome.READY
+    # Skip telemetry: the unlisted .ctg is a visible non-media skip; the AppleDouble ._*.MOV,
+    # .DS_Store, and Spotlight store.db are hidden junk counted apart (never alarming).
+    assert result.skipped_non_media_count == 1
+    assert result.skipped_extensions == ("ctg",)
+    assert result.skipped_hidden_count == 3
+
+
+def test_media_filter_off_reports_no_skips(tmp_path: Path) -> None:
+    root = _make_source(tmp_path, {"IMG_1.CR3": b"raw", "notes.txt": b"text"})
+    result = run_preflight(
+        root,
+        session_root=SESSION,
+        destination_path=tmp_path,
+        platform=FakePlatformOps(total_bytes=1 * TB, free_bytes=1 * TB),
+        verified=_never_verified,
+    )
+    assert result.skipped_non_media_count == 0
+    assert result.skipped_extensions == ()
+    assert result.skipped_hidden_count == 0
 
 
 def test_empty_media_filter_is_faithful(tmp_path: Path) -> None:

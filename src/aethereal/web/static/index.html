@@ -98,6 +98,7 @@
       <div class="row"><span class="k">New files</span><span class="v" id="dry-new">—</span></div>
       <div class="row"><span class="k">Already backed up</span><span class="v" id="dry-dup">—</span></div>
       <div class="row"><span class="k">New content</span><span class="v" id="dry-bytes">—</span></div>
+      <div class="row"><span class="k">Non-media skipped</span><span class="v" id="dry-skipped">—</span></div>
       <div class="row"><span class="k">Required / Available</span><span class="v" id="dry-cap">—</span></div>
       <div class="row"><span class="k">Result</span><span class="v" id="dry-out">—</span></div>
     </div>
@@ -347,6 +348,22 @@ $("btn-dry").onclick = async () => {
     $("dry-new").textContent = d.new_file_count;
     $("dry-dup").textContent = d.already_backed_up_count;
     $("dry-bytes").textContent = fmtBytes(d.new_bytes);
+    const skN = d.skipped_non_media_count || 0, skH = d.skipped_hidden_count || 0;
+    const skEl = $("dry-skipped");
+    if (skN === 0 && skH === 0) {
+      skEl.textContent = "none"; skEl.className = "v";
+    } else {
+      let txt = "";
+      if (skN > 0) {
+        const exts = (d.skipped_extensions || []).map(e => e ? "." + e : "(no ext)").join(" ");
+        txt = `${skN} non-media${exts ? " (" + exts + ")" : ""}`;
+      }
+      if (skH > 0) txt += (txt ? " · " : "") + `${skH} hidden`;
+      skEl.textContent = txt;
+      // A non-zero *non-media* count means a real extension was dropped — flag it so the
+      // user can add it to media_extensions if wanted. Hidden-only is benign (muted).
+      skEl.className = "v " + (skN > 0 ? "warn" : "muted");
+    }
     $("dry-cap").textContent = `${fmtBytes(d.required_bytes)} / ${fmtBytes(d.available_bytes)}`;
     const out = $("dry-out"); out.textContent = d.outcome;
     out.className = "v " + (d.outcome === "READY" ? "ok" : d.outcome === "WARNING" ? "warn" : "err");

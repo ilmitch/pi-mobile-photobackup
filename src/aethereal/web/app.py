@@ -277,6 +277,10 @@ def create_app(
             "shortfall_bytes": result.capacity.shortfall_bytes,
             "source_snapshot": result.snapshot.snapshot_sha256,
             "block_reasons": list(result.block_reasons),
+            # FILE-008: what the media whitelist left behind, so nothing drops silently.
+            "skipped_non_media_count": result.skipped_non_media_count,
+            "skipped_extensions": list(result.skipped_extensions),
+            "skipped_hidden_count": result.skipped_hidden_count,
         }
 
     @app.post("/api/v1/backups", status_code=202)

@@ -73,19 +73,44 @@ class PreflightResult:
     block_reasons: tuple[str, ...] = field(default_factory=tuple)
 
 
+def _is_media(name: str, media_extensions: frozenset[str]) -> bool:
+    """True if ``name`` is a media file selected by the extension whitelist.
+
+    Dotfiles are always rejected: this drops macOS AppleDouble sidecars (``._MVI_1234.MOV``,
+    which otherwise share the real file's extension), ``.DS_Store``, and the like. The
+    extension is matched case-insensitively, without its leading dot.
+    """
+    if name.startswith("."):
+        return False
+    return Path(name).suffix.lower().lstrip(".") in media_extensions
+
+
 def _scan_source(
-    source_root: Path, *, chunk_bytes: int
+    source_root: Path, *, chunk_bytes: int, media_extensions: frozenset[str] = frozenset()
 ) -> tuple[list[ClassificationInput], list[SourceFileRecord]]:
     """Walk ``source_root`` read-only, hashing regular files and marking others.
 
     Symlinks and special objects become UNSUPPORTED inputs; files that cannot be read
     become UNREADABLE inputs. Only successfully hashed files contribute snapshot records.
+
+    When ``media_extensions`` is non-empty, only image/video files with those extensions are
+    considered (FILE-008): every other file — and every dot-directory such as
+    ``.Spotlight-V100``/``.Trashes`` — is skipped entirely, so non-media never gets counted,
+    hashed, copied, or able to block a backup. An empty set keeps the faithful full-card
+    behaviour (copy every regular file).
     """
     inputs: list[ClassificationInput] = []
     records: list[SourceFileRecord] = []
+    filtering = bool(media_extensions)
 
-    for dirpath, _dirnames, filenames in os.walk(source_root, followlinks=False):
+    for dirpath, dirnames, filenames in os.walk(source_root, followlinks=False):
+        if filtering:
+            # Prune hidden directories in place so os.walk never descends into system junk
+            # (.Spotlight-V100, .Trashes, .fseventsd, ...).
+            dirnames[:] = [d for d in dirnames if not d.startswith(".")]
         for name in filenames:
+            if filtering and not _is_media(name, media_extensions):
+                continue
             full = Path(dirpath) / name
             relative = normalize_relative_path(full.relative_to(source_root).as_posix())
             if full.is_symlink() or not full.is_file():
@@ -137,12 +162,19 @@ def run_preflight(
     reserve_floor_bytes: int = DEFAULT_RESERVE_FLOOR_BYTES,
     metadata_estimate_bytes: int = 0,
     chunk_bytes: int = DEFAULT_CHUNK_BYTES,
+    media_extensions: frozenset[str] = frozenset(),
 ) -> PreflightResult:
-    """Run a full preflight over ``source_root`` and return the assessed result."""
+    """Run a full preflight over ``source_root`` and return the assessed result.
+
+    ``media_extensions`` (lowercase, no leading dot) restricts the scan to image/video
+    files (FILE-008); empty keeps the faithful full-card behaviour.
+    """
     if not source_root.is_dir():
         raise ValueError(f"source_root is not a directory: {source_root}")
 
-    inputs, records = _scan_source(source_root, chunk_bytes=chunk_bytes)
+    inputs, records = _scan_source(
+        source_root, chunk_bytes=chunk_bytes, media_extensions=media_extensions
+    )
     snapshot = build_source_snapshot(records)
 
     classification_of = {

@@ -31,6 +31,23 @@ def test_default_config_loads() -> None:
     assert config.source.supported_filesystems == ["vfat", "exfat"]
     assert config.backup.io_chunk_bytes == 8 * 1024 * 1024
     assert config.database.destination_synchronous == "FULL"
+    # FILE-008: media filtering is on by default and covers common stills/RAW/video.
+    assert {"jpg", "cr3", "mov", "mp4", "heic"} <= set(config.backup.media_extensions)
+
+
+def test_media_extensions_default_when_omitted() -> None:
+    # An existing on-host config that predates the key still loads, defaulting to filtering on.
+    data = _default_dict()
+    del data["backup"]["media_extensions"]
+    config = AetherealConfig.model_validate(data)
+    assert "jpg" in config.backup.media_extensions
+
+
+def test_media_extensions_can_be_emptied_for_faithful_backup() -> None:
+    data = _default_dict()
+    data["backup"]["media_extensions"] = []
+    config = AetherealConfig.model_validate(data)
+    assert config.backup.media_extensions == []
 
 
 def test_default_config_is_complete_and_forbids_extra_keys() -> None:

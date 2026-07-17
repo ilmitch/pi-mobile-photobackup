@@ -15,6 +15,22 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
+# FILE-008: default image/video extensions backed up when media filtering is on. Covers the
+# common camera stills, RAW (major brands), and video containers. Lowercase, no leading dot.
+DEFAULT_MEDIA_EXTENSIONS: tuple[str, ...] = (
+    # stills
+    "jpg", "jpeg", "jpe", "jfif", "heic", "heif", "png", "tif", "tiff", "bmp", "webp", "dng",
+    "mpo",  # 3D stills (fujifilm, nikon)
+    # raw (canon, nikon, sony, fuji, olympus, panasonic, pentax, sigma, hasselblad, gopro, ...)
+    "cr2", "cr3", "crw", "nef", "nrw", "arw", "arq", "srf", "sr2", "raf", "orf", "rw2", "raw",
+    "pef", "x3f", "3fr", "fff", "iiq", "rwl", "srw", "mrw", "kdc", "dcr", "erf", "mef", "gpr",
+    # raw video (canon cinema raw light, nikon n-raw, blackmagic, red, arri)
+    "crm", "nev", "braw", "r3d", "ari",
+    # video
+    "mov", "mp4", "m4v", "avi", "mts", "m2ts", "ts", "mxf", "3gp", "3g2", "mpg", "mpeg", "m2v",
+    "wmv", "mkv", "webm", "insv", "insp", "avchd",
+)
+
 
 class _Base(BaseModel):
     model_config = ConfigDict(extra="forbid")  # reject unknown keys (surface typos)
@@ -61,6 +77,9 @@ class BackupConfig(_Base):
     io_chunk_bytes: int = Field(gt=0)
     destination_cache_evict: bool
     direct_io_verify: bool
+    # FILE-008: only back up these image/video extensions (lowercase, no dot). An empty list
+    # disables filtering and falls back to a faithful full-card backup.
+    media_extensions: list[str] = Field(default_factory=lambda: list(DEFAULT_MEDIA_EXTENSIONS))
 
 
 class DatabaseConfig(_Base):

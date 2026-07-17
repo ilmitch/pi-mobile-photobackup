@@ -100,6 +100,7 @@ class BackupEngine:
         retries: int = 2,
         chunk_bytes: int = DEFAULT_CHUNK_BYTES,
         is_clock_trusted: Callable[[], bool] | None = None,
+        media_extensions: tuple[str, ...] = (),
     ) -> None:
         self._repo = repo
         self._object_store_root = Path(object_store_root)
@@ -112,6 +113,11 @@ class BackupEngine:
         self._reserve_floor_bytes = reserve_floor_bytes
         self._retries = retries
         self._chunk_bytes = chunk_bytes
+        # FILE-008: restrict the scan to these image/video extensions (lowercase, no dot).
+        # Empty keeps the faithful full-card backup.
+        self._media_extensions = frozenset(
+            ext.lower().lstrip(".") for ext in media_extensions if ext
+        )
         # TIME-001: a dated backup session may only be created when the clock is trusted.
         self._is_clock_trusted = is_clock_trusted or (lambda: True)
         self._sm = JobStateMachine(on_transition=self._on_transition)
@@ -209,6 +215,7 @@ class BackupEngine:
             safety_margin_min_bytes=self._safety_margin_min_bytes,
             reserve_floor_bytes=self._reserve_floor_bytes,
             chunk_bytes=self._chunk_bytes,
+            media_extensions=self._media_extensions,
         )
 
     def recover_on_startup(self) -> RecoveryReport:

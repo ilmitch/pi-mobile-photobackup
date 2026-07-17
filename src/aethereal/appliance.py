@@ -59,6 +59,7 @@ def build_appliance(
         safety_margin_min_bytes=config.destination.safety_margin_min_bytes,
         retries=config.backup.verification_retries,
         chunk_bytes=config.backup.io_chunk_bytes,
+        media_extensions=tuple(config.backup.media_extensions),
         # TIME-001: block dated sessions until the clock is trusted (RTC/phone/network).
         is_clock_trusted=(lambda: watch.clock.is_trusted)
         if config.time.require_trusted_clock

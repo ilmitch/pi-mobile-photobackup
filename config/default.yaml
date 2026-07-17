@@ -33,6 +33,73 @@ backup:
   io_chunk_bytes: 8388608
   destination_cache_evict: true
   direct_io_verify: false
+  # FILE-008: only back up these image/video extensions (lowercase, no leading dot). Dotfiles
+  # (macOS ._* / .DS_Store) and dot-directories (.Spotlight-V100, .Trashes) are always skipped.
+  # Set to an empty list ([]) for a faithful full-card backup that copies every file.
+  media_extensions:
+    - jpg
+    - jpeg
+    - jpe
+    - jfif
+    - heic
+    - heif
+    - png
+    - tif
+    - tiff
+    - bmp
+    - webp
+    - dng
+    - mpo        # 3D stills (fujifilm, nikon)
+    - cr2
+    - cr3
+    - crw
+    - nef
+    - nrw
+    - arw
+    - arq        # sony pixel-shift merged raw
+    - srf
+    - sr2
+    - raf
+    - orf
+    - rw2
+    - raw
+    - pef
+    - x3f
+    - 3fr
+    - fff
+    - iiq
+    - rwl
+    - srw
+    - mrw
+    - kdc
+    - dcr
+    - erf
+    - mef
+    - gpr
+    - crm        # canon cinema raw light (R5C, C-series)
+    - nev        # nikon n-raw video (Z8/Z9/Zf)
+    - braw       # blackmagic raw
+    - r3d        # red cinema
+    - ari        # arriraw
+    - mov
+    - mp4
+    - m4v
+    - avi
+    - mts
+    - m2ts
+    - ts
+    - mxf
+    - 3gp
+    - 3g2
+    - mpg
+    - mpeg
+    - m2v
+    - wmv
+    - mkv
+    - webm
+    - insv
+    - insp       # insta360 photo
+    - avchd
 
 database:
   appliance_path: /var/lib/aethereal-backup/appliance.db

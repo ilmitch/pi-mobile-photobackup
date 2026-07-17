@@ -140,6 +140,61 @@ def test_unreadable_file_blocks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
     assert any("unreadable" in r for r in result.block_reasons)
 
 
+def test_media_filter_keeps_only_images_and_video(tmp_path: Path) -> None:
+    # A realistic card: real media, a camera management file, an unlisted extension, and the
+    # macOS junk a card picks up on a Mac (an AppleDouble sidecar sharing the .MOV extension,
+    # plus a dot-directory of Spotlight index files).
+    root = _make_source(
+        tmp_path,
+        {
+            "DCIM/100CANON/MVI_1234.MOV": b"video-bytes",
+            "DCIM/100CANON/IMG_1234.CR3": b"raw-bytes",
+            "DCIM/100CANON/IMG_1234.JPG": b"jpg-bytes",
+            "DCIM/CANONMSC/M100CANON.CTG": b"canon-db",  # not a media extension
+            "DCIM/100CANON/._MVI_1234.MOV": b"appledouble",  # dotfile, .MOV extension
+            ".Spotlight-V100/store.db": b"spotlight-junk",  # dot-directory
+            ".DS_Store": b"finder-junk",
+        },
+    )
+    media = frozenset(("jpg", "cr3", "mov"))
+    result = run_preflight(
+        root,
+        session_root=SESSION,
+        destination_path=tmp_path,
+        platform=FakePlatformOps(total_bytes=1 * TB, free_bytes=1 * TB),
+        verified=_never_verified,
+        media_extensions=media,
+    )
+    kept = {f.relative_path for f in result.plan.files}
+    assert kept == {
+        "DCIM/100CANON/MVI_1234.MOV",
+        "DCIM/100CANON/IMG_1234.CR3",
+        "DCIM/100CANON/IMG_1234.JPG",
+    }
+    # The AppleDouble ._*.MOV must not sneak in on its extension, and nothing is left to
+    # block or warn: the junk is skipped outright, not classified UNREADABLE/UNSUPPORTED.
+    assert result.files_discovered == 3
+    assert result.unsupported_count == 0
+    assert result.unreadable_count == 0
+    assert result.snapshot.file_count == 3
+    assert result.outcome is PreflightOutcome.READY
+
+
+def test_empty_media_filter_is_faithful(tmp_path: Path) -> None:
+    # No filter -> every regular file is scanned, including hidden ones (back-compat).
+    root = _make_source(
+        tmp_path, {"IMG_1.CR3": b"raw", ".DS_Store": b"junk", "notes.txt": b"text"}
+    )
+    result = run_preflight(
+        root,
+        session_root=SESSION,
+        destination_path=tmp_path,
+        platform=FakePlatformOps(total_bytes=1 * TB, free_bytes=1 * TB),
+        verified=_never_verified,
+    )
+    assert result.files_discovered == 3
+
+
 def test_missing_source_root_raises(tmp_path: Path) -> None:
     with pytest.raises(ValueError):
         run_preflight(

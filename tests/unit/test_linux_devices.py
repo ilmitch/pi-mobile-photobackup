@@ -196,6 +196,93 @@ def test_source_candidates_exclude_destination_and_system() -> None:
     assert candidates[0].fstype == "exfat"
 
 
+def test_source_candidates_exclude_vfat_boot_partition() -> None:
+    # A real Raspberry Pi SD card carries a vfat /boot/firmware partition next to the ext4
+    # root. It must not be mistaken for a camera card just because it is vfat.
+    devices = parse_lsblk_json(
+        {
+            "blockdevices": [
+                {
+                    "name": "mmcblk0",
+                    "path": "/dev/mmcblk0",
+                    "fstype": None,
+                    "uuid": None,
+                    "label": None,
+                    "size": 32000000000,
+                    "ro": False,
+                    "mountpoint": None,
+                    "type": "disk",
+                    "model": None,
+                    "serial": "SD-SYS",
+                    "partuuid": None,
+                    "children": [
+                        {
+                            "name": "mmcblk0p1",
+                            "path": "/dev/mmcblk0p1",
+                            "fstype": "vfat",
+                            "uuid": "B2F0-82D2",
+                            "label": "bootfs",
+                            "size": 512000000,
+                            "ro": False,
+                            "mountpoint": "/boot/firmware",
+                            "type": "part",
+                            "model": None,
+                            "serial": None,
+                            "partuuid": "aaaa-0001",
+                        },
+                        {
+                            "name": "mmcblk0p2",
+                            "path": "/dev/mmcblk0p2",
+                            "fstype": "ext4",
+                            "uuid": "system-root-uuid",
+                            "label": "rootfs",
+                            "size": 31000000000,
+                            "ro": False,
+                            "mountpoint": "/",
+                            "type": "part",
+                            "model": None,
+                            "serial": None,
+                            "partuuid": "aaaa-0002",
+                        },
+                    ],
+                },
+                {
+                    "name": "sda",
+                    "path": "/dev/sda",
+                    "fstype": None,
+                    "uuid": None,
+                    "label": None,
+                    "size": 64000000000,
+                    "ro": False,
+                    "mountpoint": None,
+                    "type": "disk",
+                    "model": "USB Reader",
+                    "serial": "CARD-RDR",
+                    "children": [
+                        {
+                            "name": "sda1",
+                            "path": "/dev/sda1",
+                            "fstype": "vfat",
+                            "uuid": "CARD-0001",
+                            "label": "CANON",
+                            "size": 64000000000,
+                            "ro": False,
+                            "mountpoint": None,
+                            "type": "part",
+                            "model": None,
+                            "serial": None,
+                            "partuuid": "cccc-0001",
+                        },
+                    ],
+                },
+            ]
+        }
+    )
+    candidates = find_source_candidates(devices, destination_uuid="dest-ssd-uuid")
+    # Only the real camera card qualifies; the vfat /boot/firmware partition is excluded.
+    assert [c.path for c in candidates] == ["/dev/sda1"]
+
+
 def test_read_only_flag_parsed_from_string_or_bool() -> None:
     devices = parse_lsblk_json(
         {

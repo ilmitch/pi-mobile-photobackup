@@ -68,6 +68,17 @@ def validate_destination(
     return DestinationValidation(ok=not reasons, device=device, reasons=tuple(reasons))
 
 
+def _is_system_mount(mountpoint: str | None) -> bool:
+    """True for OS-owned mountpoints that mark a disk as the running system disk.
+
+    The Raspberry Pi's SD card holds a **vfat** ``/boot/firmware`` partition alongside the
+    ext4 root; without this, that boot partition would look exactly like a vfat camera card.
+    """
+    if not mountpoint:
+        return False
+    return mountpoint == "/" or mountpoint == "/boot" or mountpoint.startswith("/boot/")
+
+
 def find_source_candidates(
     devices: list[BlockDevice],
     *,
@@ -77,13 +88,24 @@ def find_source_candidates(
     """Return partitions that are candidate sources (FILE-001A).
 
     A candidate is a filesystem whose type is supported (vfat/exfat) and whose UUID is not
-    the configured destination. Whole-disk nodes and the destination are excluded.
+    the configured destination. Whole-disk nodes, the destination, and every partition on
+    the running system disk (the disk carrying ``/`` or ``/boot`` — e.g. the Pi's SD card
+    with its vfat ``/boot/firmware`` partition) are excluded.
     """
+    system_disk_names = {
+        disk.name
+        for disk in devices
+        if any(_is_system_mount(member.mountpoint) for member in disk.flatten())
+    }
+
     candidates: list[BlockDevice] = []
-    for device in flatten_devices(devices):
-        if device.fstype not in supported_filesystems:
+    for disk in devices:
+        if disk.name in system_disk_names:
             continue
-        if device.uuid is not None and device.uuid == destination_uuid:
-            continue
-        candidates.append(device)
+        for device in disk.flatten():
+            if device.fstype not in supported_filesystems:
+                continue
+            if device.uuid is not None and device.uuid == destination_uuid:
+                continue
+            candidates.append(device)
     return candidates

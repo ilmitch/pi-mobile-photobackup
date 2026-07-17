@@ -181,3 +181,22 @@ def test_eject_with_no_card_is_noop() -> None:
     mgr = _manager([_DEST], FakeMountService())
     assert mgr.eject() == 0
     assert mgr.awaiting_removal() is False
+
+
+def test_reformatted_card_at_same_slot_is_not_suppressed() -> None:
+    # Eject a card, then (without any poll clearing it) the same slot reappears with a NEW
+    # filesystem UUID — a camera reformat. It must be detected, not suppressed by the old
+    # ejection: suppression is keyed by UUID, not by the /dev/sdX slot.
+    mounts = FakeMountService()
+    devices = [_DEST, _dev("sda1", "CA08-1CF9", label="EOS_DIGITAL")]
+    mgr = _manager(devices, mounts)
+    assert mgr.current_source() is not None
+    assert mgr.eject() == 1
+
+    # Reformatted in-camera: same slot /dev/sda1, new UUID. No intervening poll.
+    devices[:] = [_DEST, _dev("sda1", "0A75-1333", label="EOS_DIGITAL")]
+    assert mgr.state() is MediaState.SINGLE_SOURCE
+    ref = mgr.current_source()
+    assert ref is not None
+    assert ref.root == Path(MOUNT_ROOT) / "0A75-1333"
+    assert mgr.awaiting_removal() is False

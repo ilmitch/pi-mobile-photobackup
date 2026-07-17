@@ -66,6 +66,16 @@ def _device_key(device: BlockDevice) -> str:
     return device.path or device.name
 
 
+def _identity_key(device: BlockDevice) -> str:
+    """Stable identity for eject suppression, preferring the filesystem UUID.
+
+    Keying by UUID (not the device slot) means a *reformatted* card — a new filesystem UUID
+    at the same ``/dev/sdX`` path — is never mistaken for the card that was ejected, so it is
+    detected immediately instead of staying suppressed.
+    """
+    return device.uuid or device.path or device.name
+
+
 class MediaManager:
     """Owns source detection, read-only mounting, and destination validation."""
 
@@ -105,9 +115,9 @@ class MediaManager:
         removed clears its ejection mark, so re-inserting it is detected normally.
         """
         raw = self._raw_candidates()
-        present_keys = {_device_key(d) for d in raw}
+        present_keys = {_identity_key(d) for d in raw}
         self._ejected &= present_keys  # forget cards that have physically gone
-        return [d for d in raw if _device_key(d) not in self._ejected]
+        return [d for d in raw if _identity_key(d) not in self._ejected]
 
     def eject(self) -> int:
         """Unmount present source card(s) and suppress re-mount until physically removed.
@@ -116,7 +126,7 @@ class MediaManager:
         """
         newly = 0
         for device in self._raw_candidates():
-            key = _device_key(device)
+            key = _identity_key(device)
             if key not in self._ejected:
                 self._ejected.add(key)
                 newly += 1
@@ -129,7 +139,7 @@ class MediaManager:
         Also clears marks for cards that have gone, so this is safe to poll independently of
         :meth:`source_candidates` (a removed-then-reinserted card is detected afresh).
         """
-        present_keys = {_device_key(d) for d in self._raw_candidates()}
+        present_keys = {_identity_key(d) for d in self._raw_candidates()}
         self._ejected &= present_keys
         return bool(self._ejected)
 

@@ -43,6 +43,7 @@ backup:
     - jfif
     - heic
     - heif
+    - hif        # canon heif (hdr pq) stills
     - png
     - tif
     - tiff

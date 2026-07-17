@@ -19,8 +19,8 @@ from pydantic import BaseModel, ConfigDict, Field
 # common camera stills, RAW (major brands), and video containers. Lowercase, no leading dot.
 DEFAULT_MEDIA_EXTENSIONS: tuple[str, ...] = (
     # stills
-    "jpg", "jpeg", "jpe", "jfif", "heic", "heif", "png", "tif", "tiff", "bmp", "webp", "dng",
-    "mpo",  # 3D stills (fujifilm, nikon)
+    "jpg", "jpeg", "jpe", "jfif", "heic", "heif", "hif", "png", "tif", "tiff", "bmp", "webp",
+    "dng", "mpo",  # hif = canon heif (hdr pq); mpo = 3D stills (fujifilm, nikon)
     # raw (canon, nikon, sony, fuji, olympus, panasonic, pentax, sigma, hasselblad, gopro, ...)
     "cr2", "cr3", "crw", "nef", "nrw", "arw", "arq", "srf", "sr2", "raf", "orf", "rw2", "raw",
     "pef", "x3f", "3fr", "fff", "iiq", "rwl", "srw", "mrw", "kdc", "dcr", "erf", "mef", "gpr",

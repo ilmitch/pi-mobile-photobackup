@@ -19,7 +19,14 @@ build/
 *.sqlite3
 *.aethereal-partial
 /Backups/
+# Local config overrides & secrets — real appliance config lives in /etc, never in-tree
 config/local.yaml
+config/*.local.yaml
+config/secrets*.yaml
+config/*.secret.yaml
+.env
+.env.*
+!.env.example
 
 # OS
 .DS_Store

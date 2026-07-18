@@ -147,14 +147,19 @@ sudo blkid -s UUID -o value /dev/sdX1          # <-- copy this UUID into the con
 Add it to `/etc/fstab` by UUID (grabs the UUID inline so you don't copy/paste it):
 
 ```sh
-echo "UUID=$(sudo blkid -s UUID -o value /dev/sdX1)  /mnt/backup  ext4  defaults,noatime  0  2" | sudo tee -a /etc/fstab
+echo "UUID=$(sudo blkid -s UUID -o value /dev/sdX1)  /mnt/backup  ext4  defaults,noatime,nofail,x-systemd.device-timeout=10s  0  2" | sudo tee -a /etc/fstab
 ```
 
 The line should read:
 
 ```
-UUID=<archive-uuid>  /mnt/backup  ext4  defaults,noatime  0  2
+UUID=<archive-uuid>  /mnt/backup  ext4  defaults,noatime,nofail,x-systemd.device-timeout=10s  0  2
 ```
+
+> **`nofail` is not optional for a USB drive.** Without it, if the external SSD is missing
+> or slow to enumerate at boot (USB drives often are), systemd blocks on the mount and can
+> drop to emergency mode — leaving the Pi unreachable over SSH. `nofail` lets boot proceed
+> without the drive; `x-systemd.device-timeout=10s` caps how long it waits.
 
 Verify it mounts cleanly **before** rebooting — a bad fstab entry can block boot:
 

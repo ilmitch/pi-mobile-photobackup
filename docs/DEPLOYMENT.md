@@ -15,13 +15,18 @@ This is a manual bring-up guide; a one-command installer is future work (see the
 ## 1. Hardware
 
 - Raspberry Pi 4 (64-bit)
-- High-endurance microSD for the system
+- **High-endurance** microSD for the system (cheap cards corrupt under unclean power-offs)
 - External USB **SSD** (USB 3 port) — for the backup destination
 - USB **SD card reader** (a *separate* USB port) — for the source cards
+- (Strongly recommended) a **powered USB hub** — bus-powered SSDs and card readers can
+  brown out or drop off the Pi's USB under load, causing mount failures, corrupt writes,
+  and boot hangs. A self-powered hub for the SSD + reader removes power as a variable.
 - (Recommended) DS3231-class **RTC** module — the Pi has no clock and runs offline
 - (Optional) a GPIO status **LED** + resistor
 
 Use separate USB ports for the SSD and the card reader; keep the USB-C port for power only.
+**Always shut down cleanly** (`sudo shutdown -h now` or the dashboard's Shut Down) — yanking
+power is the top cause of microSD corruption.
 
 ## 2. Operating system
 
@@ -33,8 +38,13 @@ Update and install tools:
 ```sh
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y git e2fsprogs dosfstools exfatprogs util-linux
-curl -LsSf https://astral.sh/uv/install.sh | sh   # installs uv to ~/.local/bin (or /usr/local/bin)
+curl -LsSf https://astral.sh/uv/install.sh | sh   # installs uv to ~/.local/bin
+sudo ln -sf ~/.local/bin/uv /usr/local/bin/uv     # so `sudo uv` and the systemd unit find it
 ```
+
+The installer puts `uv` in your user's `~/.local/bin`, which is **not** on root's `PATH` —
+so `sudo uv …` fails with "command not found", and the systemd unit (which runs as root and
+calls `/usr/local/bin/uv`) can't find it either. The symlink above fixes both.
 
 ## 3. Prepare the destination SSD (ext4)
 
@@ -199,6 +209,14 @@ destination:
 Keep `backup_root`, `object_store_root`, and `manifest_path` on the **same filesystem**
 (the ext4 partition) — session snapshots use hardlinks, which cannot cross filesystems.
 
+**Media filtering (FILE-008).** By default the backup copies only image/video files
+(`backup.media_extensions`) and skips camera management files and system junk (macOS `._*`,
+`.DS_Store`, `.Spotlight-V100`, …). The default list covers common stills, RAW for the
+major brands, Canon HEIF (`.hif`), and video incl. internal RAW (`crm`/`nev`). Anything
+skipped is reported in the dry-run ("Non-media skipped"), so an unlisted format is visible
+rather than dropped silently — add it to `media_extensions` if needed. Set the list to `[]`
+for a faithful full-card backup.
+
 ## 6. First run (foreground, over the LAN)
 
 Before wiring the access point, test over your normal network:
@@ -213,7 +231,8 @@ From a browser on the same network open `http://<pi-ip>:8011`. You should see th
 dashboard. Insert a source card into the USB reader — it should appear as the Source.
 Because the Pi clock is untrusted at boot, use **Set time from this device** — this reads
 your phone/browser clock and **sets the Pi's system time** (so dated session folders are
-correct even without an RTC) — then **Dry Run → Start Backup**.
+correct even without an RTC) — then **Dry Run → Start Backup**. When it finishes, use
+**Eject SD card** and wait for "safe to remove" before pulling the card.
 
 Verify independently (the ultimate check):
 

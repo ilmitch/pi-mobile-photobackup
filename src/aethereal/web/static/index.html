@@ -250,6 +250,14 @@ async function refreshDestination() {
   } catch (e) {}
 }
 
+let timeSyncInFlight = false;
+async function syncTimeFromBrowser() {
+  await api("/api/v1/time/sync", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ browser_time: new Date().toISOString() }),
+  });
+}
+
 async function refreshSystem() {
   try {
     const s = await api("/api/v1/system");
@@ -257,6 +265,17 @@ async function refreshSystem() {
     $("sys-storage").textContent = s.storage_free_bytes != null ? `${fmtBytes(s.storage_free_bytes)} free` : "—";
     $("sys-clock").textContent = s.clock_state ? s.clock_state.replace("CLOCK_", "").replace("_", " ").toLowerCase() : "—";
     $("btn-sync-time").style.display = s.clock_state === "CLOCK_UNTRUSTED" ? "" : "none";
+    // Auto-sync the Pi's clock from THIS device whenever it's untrusted, so the manual
+    // "Set time" step never blocks a backup. Uses the connecting device's clock, so it works
+    // offline over the AP (iPhone) and online alike. Retries each poll until trusted; the
+    // in-flight guard prevents overlapping requests, and it stops once the clock is trusted.
+    if (s.clock_state === "CLOCK_UNTRUSTED" && !timeSyncInFlight) {
+      timeSyncInFlight = true;
+      syncTimeFromBrowser()
+        .then(() => refreshSystem())
+        .catch(() => {})
+        .finally(() => { timeSyncInFlight = false; });
+    }
     const power = $("sys-power");
     if (s.undervoltage == null) { power.textContent = "—"; power.className = "v muted"; }
     else if (s.undervoltage) { power.textContent = "undervoltage"; power.className = "v err"; }
@@ -423,12 +442,8 @@ $("btn-shutdown").onclick = () =>
   systemAction("/api/v1/system/shutdown", "Shut down the device now?", "Shut Down");
 
 $("btn-sync-time").onclick = async () => {
-  try {
-    await api("/api/v1/time/sync", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ browser_time: new Date().toISOString() }),
-    });
-  } catch (e) { alert("Could not set time: " + e.message); }
+  try { await syncTimeFromBrowser(); }
+  catch (e) { alert("Could not set time: " + e.message); }
   refreshSystem();
 };
 

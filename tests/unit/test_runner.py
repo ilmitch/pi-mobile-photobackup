@@ -107,7 +107,7 @@ def test_cancel_after_first_file_preserves_verified(tmp_path: Path) -> None:
     token = CancellationToken()
 
     # Cancel as soon as the first file has been processed.
-    def on_progress(done: int, total: int, rel: str) -> None:
+    def on_progress(done: int, total: int, done_bytes: int, total_bytes: int, rel: str) -> None:
         if done == 1:
             token.cancel()
 

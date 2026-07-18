@@ -62,8 +62,10 @@ class JobRunResult:
     failures: tuple[str, ...] = field(default_factory=tuple)
 
 
-# Progress callback: (files_done, files_total, relative_path_just_processed).
-ProgressCallback = Callable[[int, int, str], None]
+# Progress callback: (files_done, files_total, bytes_done, bytes_total,
+# relative_path_just_processed). Bytes track planned sizes so the UI can show a byte-based
+# bar (smoother than file count when sizes vary, e.g. large video among small photos).
+ProgressCallback = Callable[[int, int, int, int, str], None]
 
 
 def run_job(
@@ -80,16 +82,19 @@ def run_job(
 ) -> JobRunResult:
     """Execute ``plan`` and return the aggregate result.
 
-    ``on_progress`` is called once per planned file with (done, total, relative_path).
-    If ``cancel_token`` is set between files, scheduling stops after the current file
-    finishes (JOB-001); already-verified files are preserved and the outcome is CANCELLED.
-    Raises ``ValueError`` if the plan is blocked — a blocked plan must never run.
+    ``on_progress`` is called once per planned file with (files_done, files_total,
+    bytes_done, bytes_total, relative_path). If ``cancel_token`` is set between files,
+    scheduling stops after the current file finishes (JOB-001); already-verified files are
+    preserved and the outcome is CANCELLED. Raises ``ValueError`` if the plan is blocked — a
+    blocked plan must never run.
     """
     if plan.blocked:
         raise ValueError("cannot run a blocked plan")
 
     total = len(plan.files)
+    total_bytes = sum(f.planned_size_bytes for f in plan.files)
     done = 0
+    bytes_done = 0
     cancelled = False
 
     verified = copied = skipped = failed = 0
@@ -153,8 +158,9 @@ def run_job(
             failures.append(f"{planned.relative_path}: unexpected blocking action")
 
         done += 1
+        bytes_done += planned.planned_size_bytes
         if on_progress is not None:
-            on_progress(done, total, planned.relative_path)
+            on_progress(done, total, bytes_done, total_bytes, planned.relative_path)
 
     if cancelled:
         outcome = JobOutcome.CANCELLED

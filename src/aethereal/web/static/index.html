@@ -354,11 +354,16 @@ function handleEvent(ev) {
   if (ev.type === "SYSTEM_STATE_CHANGED" && ev.details.to) setState(ev.details.to);
   if (ev.type === "BACKUP_STARTED") { currentJob = ev.details.job_id; refreshStatus(); }
   if (ev.type === "BACKUP_PROGRESS") {
-    const { done, total, current_file } = ev.details;
+    const { done, total, done_bytes, total_bytes, current_file } = ev.details;
     $("progress").style.display = "block";
-    const pct = total ? Math.round((done / total) * 100) : 0;
+    // Byte-based bar (smoother than file count when a big video sits among small photos);
+    // fall back to file count if byte totals are absent.
+    const pct = total_bytes ? Math.round((done_bytes / total_bytes) * 100)
+              : total ? Math.round((done / total) * 100) : 0;
     $("prog-bar").style.width = pct + "%";
-    $("prog-text").textContent = `${done} / ${total} (${pct}%)`;
+    $("prog-text").textContent = total_bytes
+      ? `${fmtBytes(done_bytes)} / ${fmtBytes(total_bytes)} (${pct}%) · ${done}/${total} files`
+      : `${done} / ${total} (${pct}%)`;
     $("prog-file").textContent = current_file || "";
   }
   if (ev.type === "BACKUP_COMPLETED" || ev.type === "BACKUP_FAILED" || ev.type === "BACKUP_CANCELLED") {

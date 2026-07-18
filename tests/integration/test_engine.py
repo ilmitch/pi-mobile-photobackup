@@ -135,9 +135,11 @@ def test_events_are_emitted(tmp_path: Path) -> None:
     assert EventType.BACKUP_STARTED in types
     assert EventType.BACKUP_PROGRESS in types
     assert EventType.BACKUP_COMPLETED in types
-    # Progress events carry done/total for the UI bar.
+    # Progress events carry file counts and byte counts for the UI bar.
     progress = [e for e in received if e.type is EventType.BACKUP_PROGRESS]
-    assert progress[-1].details["done"] == progress[-1].details["total"]
+    last = progress[-1].details
+    assert last["done"] == last["total"]
+    assert last["done_bytes"] == last["total_bytes"] == 1  # one 1-byte file copied
 
 
 def test_reformat_and_rebackup_is_cumulative(tmp_path: Path) -> None:

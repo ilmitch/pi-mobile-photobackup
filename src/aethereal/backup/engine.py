@@ -307,7 +307,9 @@ class BackupEngine:
         self._sm.transition(BackupState.BACKUP_COPYING)
         self._emit(EventType.BACKUP_STARTED, EventSeverity.INFO, "backup started", job_id=job_id)
 
-        def _on_progress(done: int, total: int, relative_path: str) -> None:
+        def _on_progress(
+            done: int, total: int, done_bytes: int, total_bytes: int, relative_path: str
+        ) -> None:
             self._emit(
                 EventType.BACKUP_PROGRESS,
                 EventSeverity.INFO,
@@ -315,6 +317,8 @@ class BackupEngine:
                 job_id=job_id,
                 done=done,
                 total=total,
+                done_bytes=done_bytes,
+                total_bytes=total_bytes,
                 current_file=relative_path,
             )
 

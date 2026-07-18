@@ -39,12 +39,12 @@ Update and install tools:
 sudo apt update && sudo apt full-upgrade -y
 sudo apt install -y git e2fsprogs dosfstools exfatprogs util-linux
 curl -LsSf https://astral.sh/uv/install.sh | sh   # installs uv to ~/.local/bin
-sudo ln -sf ~/.local/bin/uv /usr/local/bin/uv     # so `sudo uv` and the systemd unit find it
+sudo ln -sf ~/.local/bin/uv /usr/local/bin/uv     # so root / `sudo uv …` can find it
 ```
 
-The installer puts `uv` in your user's `~/.local/bin`, which is **not** on root's `PATH` —
-so `sudo uv …` fails with "command not found", and the systemd unit (which runs as root and
-calls `/usr/local/bin/uv`) can't find it either. The symlink above fixes both.
+The installer puts `uv` in your user's `~/.local/bin`, which is **not** on root's `PATH`, so
+`sudo uv …` (deploy steps 4 and 6) fails with "command not found". The symlink fixes that.
+(The systemd service runs the venv interpreter directly and does not depend on this symlink.)
 
 ## 3. Prepare the destination SSD (ext4)
 
@@ -162,7 +162,7 @@ echo "UUID=$(sudo blkid -s UUID -o value /dev/sdX1)  /mnt/backup  ext4  defaults
 
 The line should read:
 
-```
+```text
 UUID=<archive-uuid>  /mnt/backup  ext4  defaults,noatime,nofail,x-systemd.device-timeout=10s  0  2
 ```
 

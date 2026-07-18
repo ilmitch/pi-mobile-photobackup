@@ -3,6 +3,12 @@ Description=Aethereal Mobile Backup appliance
 Documentation=https://github.com/ilmitch/pi-mobile-photobackup
 After=network-online.target
 Wants=network-online.target
+# Wait for the backup destination to be mounted before starting. Paired with `nofail` on the
+# /mnt/backup fstab entry, a missing/late SSD delays this service but never blocks boot or SSH.
+RequiresMountsFor=/mnt/backup
+# Stop a crash-loop (e.g. bad config) from thrashing: give up after 5 failures in 60s.
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -10,12 +16,16 @@ Type=simple
 # of removable media. Harden later with a dedicated user + capabilities/polkit.
 User=root
 WorkingDirectory=/opt/pi-mobile-photobackup
-Environment=UV_PROJECT_ENVIRONMENT=/opt/pi-mobile-photobackup/.venv
-ExecStart=/usr/local/bin/uv run python scripts/run_appliance.py \
+# Run the project's venv interpreter directly (built by `uv sync`, deploy step 4). Invoking
+# the interpreter instead of `uv run` means no runtime resolve/sync and no network dependency
+# — the appliance runs fully offline.
+ExecStart=/opt/pi-mobile-photobackup/.venv/bin/python scripts/run_appliance.py \
     --config /etc/aethereal-backup/config.yaml \
     --host 0.0.0.0 --port 80
 Restart=on-failure
 RestartSec=3
+# Give an in-flight backup a moment to finish the current file before SIGKILL on stop.
+TimeoutStopSec=30
 
 [Install]
 WantedBy=multi-user.target
